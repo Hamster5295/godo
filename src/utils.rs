@@ -6,7 +6,7 @@ use std::{
     iter, vec,
 };
 
-use console::Style;
+use console::{style, Style};
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 use serde::Deserialize;
@@ -24,7 +24,7 @@ struct Asset {
     browser_download_url: String,
 }
 
-async fn get_all_releases(client: &Client, prerelease: bool) -> Vec<Release> {
+async fn get_releases(client: &Client, prerelease: bool) -> Vec<Release> {
     let req = client
         .get(if prerelease {
             "https://api.github.com/repos/godotengine/godot-builds/releases"
@@ -42,16 +42,23 @@ async fn get_all_releases(client: &Client, prerelease: bool) -> Vec<Release> {
         .await
         .unwrap_or_else(|err| panic!("Failed to parse the result from github: {:?}", err));
 
-    if !prerelease {
+    if prerelease {
         let mut idx = results.len();
         while idx > 0 {
             idx -= 1;
-            if results[idx].prerelease {
+            if !results[idx].prerelease {
                 results.remove(idx);
             }
         }
     }
+    results
+}
 
+async fn get_all_releases(client: &Client, prerelease: bool) -> Vec<Release> {
+    let mut results = get_releases(client, false).await;
+    if prerelease {
+        results.append(get_releases(client, true).await.as_mut());
+    }
     results
 }
 
@@ -274,13 +281,19 @@ pub async fn download(client: &Client, file_name: String, url: String) {
         .await
         .unwrap_or_else(|err| {
             if err.is_timeout() {
-                panic!("Connection Timeout: {:?}", err)
+                panic!("{}", style("Error: Connection Timeout!").red().bold())
             } else if err.is_request() {
-                panic!("Error with request: {:?}", err)
-            } else if err.is_status() {
-                panic!("Error when connecting: {:?}", err)
+                panic!(
+                    "{}\n{:?}",
+                    style("Error occurs when connecting:").red().bold(),
+                    style(err.to_string()).dim()
+                )
             } else {
-                panic!("Error: {:?}", err)
+                panic!(
+                    "{}\n{:?}",
+                    style("Error occurs:").red().bold(),
+                    style(err.to_string()).dim()
+                )
             }
         });
 
