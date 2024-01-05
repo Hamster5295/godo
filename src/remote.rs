@@ -3,7 +3,6 @@ use std::{
     env::consts,
     fs,
     io::{self, BufReader, Write},
-    iter,
 };
 
 use console::{style, Style};
@@ -99,7 +98,7 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
             .write(
                 format!(
                     "{}",
-                    dim.apply_to(iter::repeat("=").take(60).collect::<String>() + "\n")
+                    dim.apply_to("=".repeat(60) + "\n")
                 )
                 .as_bytes(),
             )
@@ -173,7 +172,7 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
             .write(
                 format!(
                     "{}",
-                    dim.apply_to(iter::repeat("=").take(30).collect::<String>() + "\n")
+                    dim.apply_to("=".repeat(30) + "\n")
                 )
                 .as_bytes(),
             )

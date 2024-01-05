@@ -10,6 +10,8 @@ use dialoguer::Confirm;
 use remote::get_download_info;
 use reqwest::Client;
 
+use crate::utils::{get_version_name_short, parse_version};
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -42,25 +44,36 @@ enum Command {
 async fn main() {
     let args = Args::parse();
 
-    let cyan = Style::new().cyan().bold().bright();
-    let yellow = Style::new().yellow().bold();
-    let red = Style::new().red().bold();
-    let green = Style::new().green().bold();
+    // let cyan = Style::new().cyan().bold().bright();
+    // let yellow = Style::new().yellow().bold();
+    // let red = Style::new().red().bold();
+    // let green = Style::new().green().bold();
 
     match &args.command {
         Command::Install { version, mono } => {
-            handle_install(version, mono);
+            handle_install(version, mono).await;
         }
-        Command::Available { prerelease } => {
-            let client = Client::new();
-            remote::list_avail(&client, *prerelease).await;
-        }
-        Command::List => {
-            let installed_dirs = utils::get_installed_dirs();
-            for dir in installed_dirs {
-                println!("{}", dir);
-            }
-        }
+        Command::Available { prerelease } => handle_available(prerelease).await,
+        Command::List => handle_list(),
+    }
+}
+
+async fn handle_available(prerelease: &bool) {
+    let client = Client::new();
+    remote::list_avail(&client, *prerelease).await;
+}
+
+fn handle_list() {
+    let dim = Style::new().dim();
+    let yellow = Style::new().yellow().bold();
+
+    println!("{}", yellow.apply_to("Installed"));
+    println!("{}", dim.apply_to("=".repeat(15)));
+
+    let installed_dirs = utils::get_installed_dirs();
+    for dir in installed_dirs {
+        let (ver, mono) = parse_version(&dir).unwrap();
+        println!("{}", get_version_name_short(&ver.to_string(), &mono));
     }
 }
 
