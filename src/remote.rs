@@ -3,13 +3,15 @@ use std::{
     env::consts,
     fs,
     io::{self, BufReader, Write},
-    iter, vec,
+    iter,
 };
 
 use console::{style, Style};
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 use serde::Deserialize;
+
+use crate::utils;
 
 macro_rules! err {
     ($title:tt, $content:expr) => {
@@ -298,9 +300,8 @@ pub async fn download(client: &Client, file_name: String, url: String) -> String
             }
         });
 
-    let folder_path = "downloads";
-    let path = format!("{}/{}.zip", folder_path, file_name);
-    fs::create_dir_all(folder_path).unwrap_or_else(|err| err!("{}\n{}", err.to_string()));
+    utils::create_install_path();
+    let path = format!("{}/{}.zip", utils::INSTALL_PATH, file_name);
     let mut writer = io::BufWriter::new(
         fs::OpenOptions::new()
             .create(true)
