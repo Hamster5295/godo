@@ -1,4 +1,4 @@
-use console::{style, StyledObject};
+use console::{style, StyledObject, Term};
 
 pub struct Procedure {
     max_steps: i32,
@@ -14,12 +14,13 @@ pub fn new(steps: i32) -> Procedure {
 
 impl Procedure {
     pub fn finish(&self, msg: String) {
-        print!("{} {}", self.get_step(), msg);
+        Term::stdout().clear_last_lines(1).unwrap();
+        println!("{} {}", self.get_step(), style(msg).green().bold());
     }
 
     pub fn next(&mut self, msg: String) {
         self.step += 1;
-        println!("{} {}", self.get_step(), style(msg).green().bold())
+        println!("{} {}", self.get_step(), msg)
     }
 
     fn get_step(&self) -> StyledObject<std::string::String> {

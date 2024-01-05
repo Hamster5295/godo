@@ -269,6 +269,7 @@ pub async fn download(client: &Client, file_name: String, url: String) {
         .get(url)
         .header("User-Agent", "Hamster5295")
         .header("Accept", "application/vnd.github.full+json")
+        .header("X-GitHub-Api-Version", "2022-11-28")
         .send()
         .await
         .unwrap_or_else(|err| {

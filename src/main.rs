@@ -51,7 +51,7 @@ async fn main() {
                     let cyan = Style::new().cyan().bold().bright();
                     let yellow = Style::new().yellow().bold();
                     let red = Style::new().red().bold();
-                    
+
                     let proc = &mut procedure::new(3);
                     proc.next("Please confirm your installation:".to_string());
                     println!(
@@ -75,10 +75,11 @@ async fn main() {
                             url,
                         )
                         .await;
-                        proc.finish("Completed!".to_string());
+                        proc.finish("Download Completed!".to_string());
                         proc.next(format!("{}", yellow.apply_to("Unzipping...")));
+                        proc.finish("Unzipped!".to_string());
                     } else {
-                        print!("{}", red.apply_to("Installation aborted"))
+                        println!("{}", red.apply_to("Installation aborted"))
                     }
                 }
                 None => {
