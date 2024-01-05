@@ -1,10 +1,12 @@
 use std::{
+    borrow::Borrow,
     env::consts,
     fs,
     io::{self, Write},
-    iter,
+    iter, vec,
 };
 
+use console::Style;
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 use serde::Deserialize;
@@ -57,27 +59,153 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
     let versions = get_all_releases(client, prerelease).await;
 
     let mut writer = io::BufWriter::new(io::stdout());
+    let yellow = Style::new().yellow().bold();
+    let green = Style::new().green().bold();
+    let white = Style::new().white();
+    let dim = Style::new().dim().bold();
 
     if prerelease {
         writer
-            .write(format!("{:15}{:8}\n", "Name", "Prelease").as_bytes())
+            .write(
+                format!(
+                    "{:15}{:15}{:15}{:15}\n",
+                    yellow.apply_to("Godot4"),
+                    yellow.apply_to("Godot4-Pre"),
+                    yellow.apply_to("Godot3"),
+                    yellow.apply_to("Godot3-Pre"),
+                )
+                .as_bytes(),
+            )
             .unwrap();
         writer
-            .write((iter::repeat("=").take(23).collect::<String>() + "\n").as_bytes())
+            .write(
+                format!(
+                    "{}",
+                    dim.apply_to(iter::repeat("=").take(60).collect::<String>() + "\n")
+                )
+                .as_bytes(),
+            )
             .unwrap();
+        let mut ver4: Vec<Release> = vec![];
+        let mut ver4_pre: Vec<Release> = vec![];
+        let mut ver3: Vec<Release> = vec![];
+        let mut ver3_pre: Vec<Release> = vec![];
         for ver in versions {
+            if ver.tag_name.starts_with("4") {
+                if ver.tag_name.ends_with("stable") {
+                    ver4.push(ver);
+                } else {
+                    ver4_pre.push(ver)
+                }
+            } else {
+                if ver.tag_name.ends_with("stable") {
+                    ver3.push(ver);
+                } else {
+                    ver3_pre.push(ver)
+                }
+            }
+        }
+
+        let lenth = ver3
+            .len()
+            .max(ver3_pre.len().max(ver4.len().max(ver4_pre.len())));
+
+        for i in 0..lenth {
             writer
-                .write(format!("{:15}{:7}\n", ver.tag_name, ver.prerelease).as_bytes())
+                .write(
+                    format!(
+                        "{:15}{:15}{:15}{:15}\n",
+                        if ver4.len() > i {
+                            if i == 0 {
+                                &green
+                            } else {
+                                &white
+                            }.apply_to(ver4[i].tag_name.borrow())
+                        } else {
+                            white.apply_to("")
+                        },
+                        if ver4_pre.len() > i {
+                            &ver4_pre[i].tag_name
+                        } else {
+                            ""
+                        },
+                        if ver3.len() > i {
+                            if i == 0 {
+                                &green
+                            } else {
+                                &white
+                            }.apply_to(ver3[i].tag_name.borrow())
+                        } else {
+                            white.apply_to("")
+                        },
+                        if ver3_pre.len() > i {
+                            &ver3_pre[i].tag_name
+                        } else {
+                            ""
+                        },
+                    )
+                    .as_bytes(),
+                )
                 .unwrap();
         }
     } else {
-        writer.write(format!("{:15}\n", "Name").as_bytes()).unwrap();
         writer
-            .write((iter::repeat("=").take(15).collect::<String>() + "\n").as_bytes())
+            .write(
+                format!(
+                    "{:15}{:15}\n",
+                    yellow.apply_to("Godot4"),
+                    yellow.apply_to("Godot3"),
+                )
+                .as_bytes(),
+            )
             .unwrap();
+        writer
+            .write(
+                format!(
+                    "{}",
+                    dim.apply_to(iter::repeat("=").take(30).collect::<String>() + "\n")
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+        let mut ver4: Vec<Release> = vec![];
+        let mut ver3: Vec<Release> = vec![];
         for ver in versions {
+            if ver.tag_name.starts_with("4") {
+                ver4.push(ver);
+            } else {
+                ver3.push(ver);
+            }
+        }
+
+        let lenth = ver3.len().max(ver4.len());
+
+        for i in 0..lenth {
             writer
-                .write(format!("{:15}\n", ver.tag_name).as_bytes())
+                .write(
+                    format!(
+                        "{:15}{:15}\n",
+                        if ver4.len() > i {
+                            if i == 0 {
+                                &green
+                            } else {
+                                &white
+                            }.apply_to(ver4[i].tag_name.borrow())
+                        } else {
+                            white.apply_to("")
+                        },
+                        if ver3.len() > i {
+                            if i == 0 {
+                                &green
+                            } else {
+                                &white
+                            }.apply_to(ver3[i].tag_name.borrow())
+                        } else {
+                            white.apply_to("")
+                        },
+                    )
+                    .as_bytes(),
+                )
                 .unwrap();
         }
     }
@@ -159,7 +287,17 @@ pub async fn download(client: &Client, url: String) {
         .header("Accept", "application/vnd.github.full+json")
         .send()
         .await
-        .unwrap_or_else(|err| panic!("Unable to fetch from github: {:?}", err));
+        .unwrap_or_else(|err| {
+            if err.is_timeout() {
+                panic!("Connection Timeout: {:?}", err)
+            } else if err.is_request() {
+                panic!("Error with request: {:?}", err)
+            } else if err.is_status() {
+                panic!("Error when connecting: {:?}", err)
+            } else {
+                panic!("Error: {:?}", err)
+            }
+        });
 
     let mut writer = io::BufWriter::new(
         fs::OpenOptions::new()

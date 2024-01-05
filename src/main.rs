@@ -2,8 +2,8 @@ mod utils;
 use clap::{Parser, Subcommand};
 use console::Style;
 use dialoguer::Confirm;
-use utils::get_download_info;
 use reqwest::Client;
+use utils::get_download_info;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -47,14 +47,17 @@ async fn main() {
             let client = Client::new();
             match get_download_info(&client, version_str, mono.to_owned()).await {
                 Some((file, url)) => {
-                    let cyan = Style::new().cyan().bold();
+                    let cyan = Style::new().cyan().bold().bright();
                     let yellow = Style::new().yellow().bold();
                     let red = Style::new().red().bold();
                     let green = Style::new().green().bold();
+                    let dim = Style::new().dim().bold();
                     println!(
-                        "Please confirm your installation: \n> Godot {} {}",
+                        "{} Please confirm your installation: \n\t> {} {} {} <",
+                        dim.apply_to("[1/3]"),
+                        cyan.apply_to("Godot"),
                         cyan.apply_to(file),
-                        yellow.apply_to(if *mono { "mono" } else { "" })
+                        cyan.apply_to(if *mono { "mono" } else { "" })
                     );
                     if Confirm::new()
                         .with_prompt("Do you want to proceed?")
@@ -64,11 +67,20 @@ async fn main() {
                         .interact()
                         .unwrap()
                     {
-                        println!("{}",green.apply_to("Starting installation..."));
+                        println!(
+                            "{} {}",
+                            dim.apply_to("[2/3]"),
+                            yellow.apply_to("Downloading...")
+                        );
                         utils::download(&client, url).await;
-                        println!("{}",green.apply_to("Installed!"));
-                    }else{
-                        print!("{}",red.apply_to("Installation aborted"))
+                        println!("{}", green.apply_to("Download completed!"));
+                        println!(
+                            "{} {}",
+                            dim.apply_to("[3/3]"),
+                            yellow.apply_to("Unzipping...")
+                        );
+                    } else {
+                        print!("{}", red.apply_to("Installation aborted"))
                     }
                 }
                 None => {
