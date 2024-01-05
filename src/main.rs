@@ -1,6 +1,8 @@
 mod procedure;
 mod utils;
 
+use std::fs;
+
 use clap::{Parser, Subcommand};
 use console::Style;
 use dialoguer::Confirm;
@@ -46,20 +48,26 @@ async fn main() {
                 }
                 None => version_str = "4".to_string(),
             }
+
             let client = Client::new();
+
             let cyan = Style::new().cyan().bold().bright();
             let yellow = Style::new().yellow().bold();
             let red = Style::new().red().bold();
+            let green = Style::new().green().bold();
+
             match get_download_info(&client, version_str, mono.to_owned()).await {
                 Some((file, url)) => {
-                    let proc = &mut procedure::new(3);
+                    let proc = &mut procedure::new(4);
                     proc.next("Please confirm your installation:".to_string());
-                    println!(
-                        "\t> {} {} {} <",
-                        cyan.apply_to("Godot"),
-                        cyan.apply_to(&file),
-                        cyan.apply_to(if *mono { "mono" } else { "" })
+                    let version_name = file.trim();
+                    let cur_version = format!(
+                        "{} {} {}",
+                        "Godot",
+                        &version_name,
+                        if *mono { "mono" } else { "" }
                     );
+                    println!("\t> {} <", cyan.apply_to(&cur_version));
                     if Confirm::new()
                         .with_prompt("Do you want to proceed?")
                         .default(true)
@@ -77,8 +85,21 @@ async fn main() {
                         .await;
                         proc.finish("Download Completed!".to_string());
                         proc.next(format!("{}", yellow.apply_to("Unzipping...")));
-                        utils::unzip(path);
+                        utils::unzip(&path);
                         proc.finish("Unzipped!".to_string());
+                        proc.next(format!("{}", yellow.apply_to("Clearing cache...")));
+                        fs::remove_file(&path).unwrap();
+                        proc.finish("Cleared!".to_string());
+                        println!(
+                            "{} is now {}.",
+                            cyan.apply_to(&cur_version),
+                            green.apply_to("READY")
+                        );
+                        println!(
+                            "Use {} {} to begin.",
+                            yellow.apply_to("godo run"),
+                            green.apply_to(&file)
+                        );
                     } else {
                         println!("{}", red.apply_to("Installation aborted"))
                     }

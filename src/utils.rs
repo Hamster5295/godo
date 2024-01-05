@@ -345,7 +345,7 @@ pub async fn download(client: &Client, file_name: String, url: String) -> String
     path
 }
 
-pub fn unzip(path: String) {
+pub fn unzip(path: &String) {
     let mut zip = zip::ZipArchive::new(BufReader::new(
         fs::OpenOptions::new()
             .read(true)
