@@ -2,7 +2,7 @@ use std::{
     borrow::Borrow,
     env::consts,
     fs,
-    io::{self, Write},
+    io::{self, BufReader, Write},
     iter, vec,
 };
 
@@ -10,6 +10,15 @@ use console::{style, Style};
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 use serde::Deserialize;
+
+macro_rules! err {
+    ($title:tt, $content:expr) => {
+        panic!("{}\n{}", style($title).red().bold(), style($content).dim())
+    };
+    ($title:tt) => {
+        panic!("{}", style($title).red().bold())
+    };
+}
 
 #[derive(Deserialize)]
 struct Release {
@@ -35,12 +44,12 @@ async fn get_releases(client: &Client, prerelease: bool) -> Vec<Release> {
     let response = req
         .send()
         .await
-        .unwrap_or_else(|err| panic!("Failed to connect to github: {:?}", err));
+        .unwrap_or_else(|err| err!("Failed to connect to github: ", err.to_string()));
 
     let mut results = response
         .json::<Vec<Release>>()
         .await
-        .unwrap_or_else(|err| panic!("Failed to parse the result from github: {:?}", err));
+        .unwrap_or_else(|err| err!("Failed to parse the result from github: ", err.to_string()));
 
     if prerelease {
         let mut idx = results.len();
@@ -235,7 +244,7 @@ pub async fn get_download_info(
             "windows" => "win",
             "macos" => "macos",
             "linux" => "linux",
-            _ => panic!("Unsupported operating system!"),
+            _ => err!("Unsupported operating system!"),
         }) && item.name.contains(match consts::ARCH {
             "x86_64" => {
                 if consts::OS == "windows" {
@@ -271,7 +280,7 @@ pub async fn get_download_info(
     None
 }
 
-pub async fn download(client: &Client, file_name: String, url: String) {
+pub async fn download(client: &Client, file_name: String, url: String) -> String {
     let mut result = client
         .get(url)
         .header("User-Agent", "Hamster5295")
@@ -281,23 +290,17 @@ pub async fn download(client: &Client, file_name: String, url: String) {
         .await
         .unwrap_or_else(|err| {
             if err.is_timeout() {
-                panic!("{}", style("Error: Connection Timeout!").red().bold())
+                err!("Error: Connection Timeout!");
             } else if err.is_request() {
-                panic!(
-                    "{}\n{:?}",
-                    style("Error occurs when connecting:").red().bold(),
-                    style(err.to_string()).dim()
-                )
+                err!("Error occurs when connecting: ", err.to_string());
             } else {
-                panic!(
-                    "{}\n{:?}",
-                    style("Error occurs:").red().bold(),
-                    style(err.to_string()).dim()
-                )
+                err!("Error occurs: ", err.to_string());
             }
         });
 
-    let path = format!("{}.zip", file_name);
+    let folder_path = "downloads";
+    let path = format!("{}/{}.zip", folder_path, file_name);
+    fs::create_dir_all(folder_path).unwrap_or_else(|err| err!("{}\n{}", err.to_string()));
     let mut writer = io::BufWriter::new(
         fs::OpenOptions::new()
             .create(true)
@@ -305,13 +308,16 @@ pub async fn download(client: &Client, file_name: String, url: String) {
             .open(&path)
             .unwrap_or_else(|err| match err.kind() {
                 io::ErrorKind::NotFound => {
-                    panic!("Path not found: {}", &path);
+                    err!("Path not found: ", &path);
                 }
                 io::ErrorKind::PermissionDenied => {
-                    panic!("Permission denied.\nPlease guarantee Write permission to the directory: {}",&path)
-                },
-                _=>{
-                    panic!("Error: {:?}",err);
+                    err!(
+                        "Permission denied.\nPlease guarantee Write permission to the directory: ",
+                        &path
+                    );
+                }
+                _ => {
+                    err!("Error: ", err);
                 }
             }),
     );
@@ -328,11 +334,25 @@ pub async fn download(client: &Client, file_name: String, url: String) {
     while let Some(content) = result
         .chunk()
         .await
-        .unwrap_or_else(|err| panic!("Error when downloading: {:?}", err))
+        .unwrap_or_else(|err| err!("Error when downloading: ", err.to_string()))
     {
         writer.write(&content).unwrap();
         bar.inc(content.len() as u64);
     }
 
     writer.flush().unwrap();
+
+    path
+}
+
+pub fn unzip(path: String) {
+    let mut zip = zip::ZipArchive::new(BufReader::new(
+        fs::OpenOptions::new()
+            .read(true)
+            .open(&path)
+            .unwrap_or_else(|err| err!("Error with zipped file: ", err.to_string())),
+    ))
+    .unwrap();
+    zip.extract(path.trim_end_matches(".zip"))
+        .unwrap_or_else(|err| err!("Error when unzipping: ", err.to_string()));
 }

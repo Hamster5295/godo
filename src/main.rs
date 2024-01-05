@@ -1,5 +1,6 @@
 mod procedure;
 mod utils;
+
 use clap::{Parser, Subcommand};
 use console::Style;
 use dialoguer::Confirm;
@@ -46,12 +47,11 @@ async fn main() {
                 None => version_str = "4".to_string(),
             }
             let client = Client::new();
+            let cyan = Style::new().cyan().bold().bright();
+            let yellow = Style::new().yellow().bold();
+            let red = Style::new().red().bold();
             match get_download_info(&client, version_str, mono.to_owned()).await {
                 Some((file, url)) => {
-                    let cyan = Style::new().cyan().bold().bright();
-                    let yellow = Style::new().yellow().bold();
-                    let red = Style::new().red().bold();
-
                     let proc = &mut procedure::new(3);
                     proc.next("Please confirm your installation:".to_string());
                     println!(
@@ -69,7 +69,7 @@ async fn main() {
                         .unwrap()
                     {
                         proc.next(format!("{}", yellow.apply_to("Downloading...")));
-                        utils::download(
+                        let path = utils::download(
                             &client,
                             format!("Godot_{}{}", &file, if *mono { "_mono" } else { "" }),
                             url,
@@ -77,13 +77,18 @@ async fn main() {
                         .await;
                         proc.finish("Download Completed!".to_string());
                         proc.next(format!("{}", yellow.apply_to("Unzipping...")));
+                        utils::unzip(path);
                         proc.finish("Unzipped!".to_string());
                     } else {
                         println!("{}", red.apply_to("Installation aborted"))
                     }
                 }
                 None => {
-                    println!("No suitable version found for your system.")
+                    println!(
+                        "{}\n> Use {} to find another version.",
+                        red.apply_to("No Suitable Version found."),
+                        yellow.apply_to("godo available")
+                    )
                 }
             };
         }
