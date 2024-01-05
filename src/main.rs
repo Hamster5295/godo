@@ -1,3 +1,4 @@
+mod procedure;
 mod utils;
 use clap::{Parser, Subcommand};
 use console::Style;
@@ -50,13 +51,13 @@ async fn main() {
                     let cyan = Style::new().cyan().bold().bright();
                     let yellow = Style::new().yellow().bold();
                     let red = Style::new().red().bold();
-                    let green = Style::new().green().bold();
-                    let dim = Style::new().dim().bold();
+                    
+                    let proc = &mut procedure::new(3);
+                    proc.next("Please confirm your installation:".to_string());
                     println!(
-                        "{} Please confirm your installation: \n\t> {} {} {} <",
-                        dim.apply_to("[1/3]"),
+                        "\t> {} {} {} <",
                         cyan.apply_to("Godot"),
-                        cyan.apply_to(file),
+                        cyan.apply_to(&file),
                         cyan.apply_to(if *mono { "mono" } else { "" })
                     );
                     if Confirm::new()
@@ -67,18 +68,15 @@ async fn main() {
                         .interact()
                         .unwrap()
                     {
-                        println!(
-                            "{} {}",
-                            dim.apply_to("[2/3]"),
-                            yellow.apply_to("Downloading...")
-                        );
-                        utils::download(&client, url).await;
-                        println!("{}", green.apply_to("Download completed!"));
-                        println!(
-                            "{} {}",
-                            dim.apply_to("[3/3]"),
-                            yellow.apply_to("Unzipping...")
-                        );
+                        proc.next(format!("{}", yellow.apply_to("Downloading...")));
+                        utils::download(
+                            &client,
+                            format!("Godot_{}{}", &file, if *mono { "_mono" } else { "" }),
+                            url,
+                        )
+                        .await;
+                        proc.finish("Completed!".to_string());
+                        proc.next(format!("{}", yellow.apply_to("Unzipping...")));
                     } else {
                         print!("{}", red.apply_to("Installation aborted"))
                     }

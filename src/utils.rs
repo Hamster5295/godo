@@ -116,11 +116,7 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
                     format!(
                         "{:15}{:15}{:15}{:15}\n",
                         if ver4.len() > i {
-                            if i == 0 {
-                                &green
-                            } else {
-                                &white
-                            }.apply_to(ver4[i].tag_name.borrow())
+                            if i == 0 { &green } else { &white }.apply_to(ver4[i].tag_name.borrow())
                         } else {
                             white.apply_to("")
                         },
@@ -130,11 +126,7 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
                             ""
                         },
                         if ver3.len() > i {
-                            if i == 0 {
-                                &green
-                            } else {
-                                &white
-                            }.apply_to(ver3[i].tag_name.borrow())
+                            if i == 0 { &green } else { &white }.apply_to(ver3[i].tag_name.borrow())
                         } else {
                             white.apply_to("")
                         },
@@ -186,20 +178,12 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
                     format!(
                         "{:15}{:15}\n",
                         if ver4.len() > i {
-                            if i == 0 {
-                                &green
-                            } else {
-                                &white
-                            }.apply_to(ver4[i].tag_name.borrow())
+                            if i == 0 { &green } else { &white }.apply_to(ver4[i].tag_name.borrow())
                         } else {
                             white.apply_to("")
                         },
                         if ver3.len() > i {
-                            if i == 0 {
-                                &green
-                            } else {
-                                &white
-                            }.apply_to(ver3[i].tag_name.borrow())
+                            if i == 0 { &green } else { &white }.apply_to(ver3[i].tag_name.borrow())
                         } else {
                             white.apply_to("")
                         },
@@ -280,7 +264,7 @@ pub async fn get_download_info(
     None
 }
 
-pub async fn download(client: &Client, url: String) {
+pub async fn download(client: &Client, file_name: String, url: String) {
     let mut result = client
         .get(url)
         .header("User-Agent", "Hamster5295")
@@ -299,12 +283,23 @@ pub async fn download(client: &Client, url: String) {
             }
         });
 
+    let path = format!("{}.zip", file_name);
     let mut writer = io::BufWriter::new(
         fs::OpenOptions::new()
             .create(true)
             .write(true)
-            .open("godot.zip")
-            .unwrap(),
+            .open(&path)
+            .unwrap_or_else(|err| match err.kind() {
+                io::ErrorKind::NotFound => {
+                    panic!("Path not found: {}", &path);
+                }
+                io::ErrorKind::PermissionDenied => {
+                    panic!("Permission denied.\nPlease guarantee Write permission to the directory: {}",&path)
+                },
+                _=>{
+                    panic!("Error: {:?}",err);
+                }
+            }),
     );
 
     let length = result.content_length().unwrap();
