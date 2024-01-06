@@ -3,7 +3,7 @@ A command-line tool for managing different versions of [Godot Engine](https://gi
 
 Written in Rust.  
 
-> [!INFO]  
+> [!NOTE]  
 >   
 > Currently **Godo** supports Windows only, and will soon catch up with macos and linux :D
 
