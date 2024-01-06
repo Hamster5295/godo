@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 
+#[derive(PartialEq)]
 pub struct Version {
     tag: String,
     mono: bool,
@@ -44,22 +45,6 @@ pub fn compare(tag1: String, tag2: String) -> Ordering {
         return cmp;
     }
     Ordering::Equal
-}
-
-pub fn compare_opt(ver1: &Option<Version>, ver2: &Option<Version>) -> Ordering {
-    if let Some(v1) = ver1 {
-        if let Some(v2) = ver2 {
-            compare(v1.tag(), v2.tag())
-        } else {
-            Ordering::Greater
-        }
-    } else {
-        if let Some(_v2) = ver2 {
-            Ordering::Less
-        }else{
-            Ordering::Equal
-        }
-    }
 }
 
 impl Version {

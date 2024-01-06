@@ -34,6 +34,16 @@ pub fn get_installed_dirs() -> Vec<String> {
     installs
 }
 
+pub fn get_installed_versions() -> Vec<Version> {
+    let mut vers = vec![];
+    for dir in get_installed_dirs() {
+        if let Some(ver) = version::parse(dir) {
+            vers.push(ver);
+        }
+    }
+    vers
+}
+
 pub fn get_executables(dir: String) -> Vec<String> {
     let mut files = vec![];
 
@@ -52,13 +62,19 @@ pub fn get_executable(dir: String, console: bool) -> Option<String> {
     let files = get_executables(dir);
     let mut result: Option<String> = None;
     for file in files {
-        if console && !file.contains("console") {
+        if !file.ends_with(".exe") {
             continue;
         }
 
         if let Some(ref res) = result {
-            if res.contains("console") && !file.contains("console") {
-                result = Some(file);
+            if console {
+                if res.contains("console") && !file.contains("console") {
+                    result = Some(file);
+                }
+            } else {
+                if !res.contains("console") && file.contains("console") {
+                    result = Some(file);
+                }
             }
         } else {
             result = Some(file);
@@ -67,7 +83,7 @@ pub fn get_executable(dir: String, console: bool) -> Option<String> {
     result
 }
 
-pub fn search_installed_version(keyword: &Option<String>, mono: bool) -> Option<Version> {
+pub fn search_installed_version(keyword: &Option<String>, mono: Option<bool>) -> Option<Version> {
     let dirs: Vec<String> = get_installed_dirs();
     match keyword {
         Some(version) => {
@@ -82,7 +98,7 @@ pub fn search_installed_version(keyword: &Option<String>, mono: bool) -> Option<
 }
 
 fn search_installed_version_with_dirs<F>(
-    mono: bool,
+    mono: Option<bool>,
     dirs: Vec<String>,
     condition: F,
 ) -> Option<Version>
@@ -94,8 +110,10 @@ where
         if let Some(ver) = version::parse(dir) {
             // Fit the keyword
             if condition(&ver) {
-                if mono && !ver.mono() {
-                    continue;
+                if let Some(mono_flag) = mono {
+                    if mono_flag != ver.mono() {
+                        continue;
+                    }
                 }
 
                 if let Some(ref cur_ver) = result {
@@ -123,4 +141,9 @@ where
         }
     }
     result
+}
+
+pub fn uninstall_version(version: Version) {
+    fs::remove_dir_all(Path::new(INSTALL_PATH).join(version.dir_name()))
+        .unwrap_or_else(|err| err!("Error when uninstalling:", err.to_string()));
 }
