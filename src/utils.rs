@@ -1,5 +1,5 @@
 use console::style;
-use std::{fs, io::Error};
+use std::fs;
 
 pub const INSTALL_PATH: &str = "downloads";
 
@@ -11,41 +11,6 @@ macro_rules! err {
     ($title:tt) => {
         panic!("{}", style($title).red().bold())
     };
-}
-
-pub fn get_dir_name(tag: &String, mono: &bool) -> String {
-    let mut result = format!("Godot_{}", tag);
-    if *mono {
-        result += "_mono";
-    }
-    result
-}
-
-pub fn get_version_name(tag: &String, mono: &bool) -> String {
-    "Godot ".to_string() + &get_version_name_short(tag, mono)
-}
-
-pub fn get_version_name_short(tag: &String, mono: &bool) -> String {
-    let mut result = format!("{}", tag);
-    if *mono {
-        result += " mono";
-    }
-    result
-}
-
-pub fn parse_version(name: &String) -> Result<(&str, bool), Error> {
-    let results: Vec<&str> = name.split(&[' ', '_']).collect();
-    if results.len() < 2 {
-        Err(Error::new(
-            std::io::ErrorKind::InvalidInput,
-            format!(
-                "Wrong format! Require Godot_[version]_[mono] or Godot [version] [mono], found {}",
-                name
-            ),
-        ))
-    } else {
-        Ok((results[1], results.len() >= 3))
-    }
 }
 
 pub fn create_install_path() {
