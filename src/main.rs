@@ -15,11 +15,11 @@ use reqwest::Client;
 #[command(author, version, about, long_about = None)]
 struct Args {
     #[command(subcommand)]
-    command: Command,
+    command: CliCommand,
 }
 
 #[derive(Subcommand, Clone)]
-enum Command {
+enum CliCommand {
     /// Install Godot with optional specific version.
     Install {
         /// The version to install.
@@ -45,6 +45,10 @@ enum Command {
         /// Whether to run the Mono version.
         #[arg(short, long)]
         mono: bool,
+
+        /// Whether to run with console. Has no effect with Godot 3.x
+        #[arg(short, long)]
+        console: bool,
     },
 }
 
@@ -53,12 +57,16 @@ async fn main() {
     let args = Args::parse();
 
     match &args.command {
-        Command::Install { version, mono } => {
+        CliCommand::Install { version, mono } => {
             handle_install(version, mono).await;
         }
-        Command::Available { prerelease } => handle_available(prerelease).await,
-        Command::List => handle_list(),
-        Command::Run { version, mono } => handle_run(version, mono),
+        CliCommand::Available { prerelease } => handle_available(prerelease).await,
+        CliCommand::List => handle_list(),
+        CliCommand::Run {
+            version,
+            mono,
+            console,
+        } => handle_run(version, mono, console).await,
     }
 }
 
@@ -82,9 +90,33 @@ fn handle_list() {
     }
 }
 
-fn handle_run(version: &Option<String>, mono: &bool) {
+async fn handle_run(version: &Option<String>, mono: &bool, console: &bool) {
+    let red = Style::new().red().bold();
+
     if let Some(ver) = utils::search_installed_version(version, *mono) {
-        println!("{}", ver.version_name())
+        if let Some(exec) = utils::get_executable(ver.dir_name(), *console) {
+            println!("{}", exec);
+            tokio::process::Command::new(exec).spawn().expect(
+                format!(
+                    "{} {}",
+                    red.apply_to("Failed to run"),
+                    red.apply_to(ver.version_name())
+                )
+                .as_str(),
+            );
+        }
+    } else {
+        println!("{}", red.apply_to("No installed version found."));
+        if Confirm::new()
+            .with_prompt("Install a new version?")
+            .wait_for_newline(true)
+            .interact()
+            .unwrap()
+        {
+            handle_install(version, mono).await;
+        } else {
+            println!("{}", red.apply_to("Aborted."));
+        }
     }
 }
 
@@ -139,7 +171,7 @@ async fn handle_install(version: &Option<String>, mono: &bool) {
                     green.apply_to(ver.tag())
                 );
             } else {
-                println!("{}", red.apply_to("Installation aborted"))
+                println!("{}", red.apply_to("Aborted"))
             }
         }
         None => {
