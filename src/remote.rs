@@ -3,6 +3,7 @@ use std::{
     env::consts,
     fs,
     io::{self, BufReader, Write},
+    path::{Path, PathBuf},
 };
 
 use console::{style, Style};
@@ -11,7 +12,7 @@ use reqwest::Client;
 use serde::Deserialize;
 
 use crate::{
-    utils,
+    utils::{self},
     version::{self, Version},
 };
 
@@ -340,7 +341,7 @@ pub async fn download(client: &Client, file_name: String, url: String) -> String
     path
 }
 
-pub fn unzip(path: &String) {
+pub fn unzip(path: &String, mono: bool) {
     let mut zip = zip::ZipArchive::new(BufReader::new(
         fs::OpenOptions::new()
             .read(true)
@@ -348,6 +349,29 @@ pub fn unzip(path: &String) {
             .unwrap_or_else(|err| err!("Error with zipped file: ", err.to_string())),
     ))
     .unwrap();
-    zip.extract(path.trim_end_matches(".zip"))
+
+    let target_path = if !mono {
+        path.trim_end_matches(".zip").to_string()
+    } else {
+        format!("{}_temp", path.trim_end_matches(".zip"))
+    };
+    zip.extract(&target_path)
         .unwrap_or_else(|err| err!("Error when unzipping: ", err.to_string()));
+
+    if mono {
+        let mut subpath: Option<PathBuf> = None;
+        for dir in fs::read_dir(&target_path).unwrap() {
+            let path = dir.unwrap().path();
+            if path.is_dir() {
+                subpath = Some(path);
+                break;
+            }
+        }
+
+        if let Some(sp) = subpath {
+            let root = Path::new(path.trim_end_matches(".zip"));
+            fs::rename(sp, root).unwrap_or_else(|err| panic!("{}", err.to_string()));
+            fs::remove_dir_all(target_path).unwrap();
+        }
+    }
 }
