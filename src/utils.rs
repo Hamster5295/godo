@@ -1,5 +1,9 @@
 use console::style;
-use std::{cmp::Ordering, fs, path::Path};
+use std::{
+    cmp::Ordering,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::version::{self, Version};
 
@@ -15,8 +19,14 @@ macro_rules! err {
     };
 }
 
+pub fn get_install_path() -> PathBuf {
+    std::env::current_exe()
+        .unwrap()
+        .with_file_name(INSTALL_PATH)
+}
+
 pub fn create_install_path() {
-    fs::create_dir_all(INSTALL_PATH)
+    fs::create_dir_all(get_install_path())
         .unwrap_or_else(|err| err!("Unable to create install directory: ", err.to_string()));
 }
 
@@ -24,7 +34,7 @@ pub fn get_installed_dirs() -> Vec<String> {
     create_install_path();
 
     let mut installs = vec![];
-    for dir_result in fs::read_dir(INSTALL_PATH).unwrap() {
+    for dir_result in fs::read_dir(get_install_path()).unwrap() {
         let dir = dir_result.unwrap();
         let path = dir.path();
         if path.is_dir() {
@@ -47,7 +57,7 @@ pub fn get_installed_versions() -> Vec<Version> {
 pub fn get_executables(dir: String) -> Vec<String> {
     let mut files = vec![];
 
-    for dir_result in fs::read_dir(Path::new(INSTALL_PATH).join(dir)).unwrap() {
+    for dir_result in fs::read_dir(get_install_path().join(dir)).unwrap() {
         let dir = dir_result.unwrap();
         let path = dir.path();
         if path.is_file() {
@@ -144,6 +154,6 @@ where
 }
 
 pub fn uninstall_version(version: Version) {
-    fs::remove_dir_all(Path::new(INSTALL_PATH).join(version.dir_name()))
+    fs::remove_dir_all(get_install_path().join(version.dir_name()))
         .unwrap_or_else(|err| err!("Error when uninstalling:", err.to_string()));
 }

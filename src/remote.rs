@@ -296,7 +296,11 @@ pub async fn download(client: &Client, file_name: String, url: String) -> String
         });
 
     utils::create_install_path();
-    let path = format!("{}/{}.zip", utils::INSTALL_PATH, file_name);
+    let path = utils::get_install_path()
+        .join(file_name + ".zip")
+        .to_str()
+        .unwrap()
+        .to_string();
     let mut writer = io::BufWriter::new(
         fs::OpenOptions::new()
             .create(true)
@@ -337,7 +341,6 @@ pub async fn download(client: &Client, file_name: String, url: String) -> String
     }
 
     writer.flush().unwrap();
-
     path
 }
 
