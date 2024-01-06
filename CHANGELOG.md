@@ -10,3 +10,7 @@ This is the changelog of **Godo**, a version manager for [Godot Engine](https://
   * `list` - List the installed Godot Engines.
   * `run` - Run Godot Engine with specific version.
 * Automatic installing, uninstalling and running features.
+
+## [1.0.1] - 2024-1-6
+### Fixed
+* Fixed the error file path when installing
