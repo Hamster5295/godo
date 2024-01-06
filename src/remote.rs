@@ -3,7 +3,7 @@ use std::{
     env::consts,
     fs,
     io::{self, BufReader, Write},
-    iter,
+    path::{Path, PathBuf},
 };
 
 use console::{style, Style};
@@ -11,7 +11,10 @@ use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 use serde::Deserialize;
 
-use crate::utils;
+use crate::{
+    utils::{self},
+    version::{self, Version},
+};
 
 macro_rules! err {
     ($title:tt, $content:expr) => {
@@ -96,13 +99,7 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
             )
             .unwrap();
         writer
-            .write(
-                format!(
-                    "{}",
-                    dim.apply_to(iter::repeat("=").take(60).collect::<String>() + "\n")
-                )
-                .as_bytes(),
-            )
+            .write(format!("{}", dim.apply_to("=".repeat(60) + "\n")).as_bytes())
             .unwrap();
         let mut ver4: Vec<Release> = vec![];
         let mut ver4_pre: Vec<Release> = vec![];
@@ -170,13 +167,7 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
             )
             .unwrap();
         writer
-            .write(
-                format!(
-                    "{}",
-                    dim.apply_to(iter::repeat("=").take(30).collect::<String>() + "\n")
-                )
-                .as_bytes(),
-            )
+            .write(format!("{}", dim.apply_to("=".repeat(30) + "\n")).as_bytes())
             .unwrap();
         let mut ver4: Vec<Release> = vec![];
         let mut ver3: Vec<Release> = vec![];
@@ -215,32 +206,36 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
     writer.flush().unwrap();
 }
 
-pub async fn get_download_info(
+pub async fn search_remote_version(
     client: &Client,
-    version: String,
+    version: &Option<String>,
     mono: bool,
-) -> Option<(String, String)> {
-    let releases = get_all_releases(
-        client,
-        version.contains("-") && !version.ends_with("stable"),
-    )
-    .await;
-    let result = {
-        let mut idx = 0;
-        let mut flag = false;
-        for item in &releases {
-            if item.tag_name.starts_with(version.as_str()) {
-                flag = true;
-                break;
+) -> Option<(Version, String)> {
+    let result: usize;
+    let releases: Vec<Release>;
+    if let Some(ver) = version {
+        releases = get_all_releases(client, ver.contains("-") && !ver.ends_with("stable")).await;
+        result = {
+            let mut idx = 0;
+            let mut flag = false;
+            for item in &releases {
+                if item.tag_name.starts_with(ver) {
+                    flag = true;
+                    break;
+                }
+                idx += 1;
             }
-            idx += 1;
-        }
-        if flag {
-            idx
-        } else {
-            return None;
-        }
+            if flag {
+                idx
+            } else {
+                return None;
+            }
+        };
+    } else {
+        releases = get_all_releases(client, false).await;
+        result = 0;
     };
+
     for item in &releases[result].assets {
         if item.name.contains(match consts::OS {
             "windows" => "win",
@@ -274,7 +269,7 @@ pub async fn get_download_info(
         }) && item.name.contains("mono") == mono
         {
             return Some((
-                releases[result].tag_name.clone(),
+                version::new(releases[result].tag_name.to_string(), mono),
                 item.browser_download_url.clone(),
             ));
         }
@@ -346,7 +341,7 @@ pub async fn download(client: &Client, file_name: String, url: String) -> String
     path
 }
 
-pub fn unzip(path: &String) {
+pub fn unzip(path: &String, mono: bool) {
     let mut zip = zip::ZipArchive::new(BufReader::new(
         fs::OpenOptions::new()
             .read(true)
@@ -354,6 +349,29 @@ pub fn unzip(path: &String) {
             .unwrap_or_else(|err| err!("Error with zipped file: ", err.to_string())),
     ))
     .unwrap();
-    zip.extract(path.trim_end_matches(".zip"))
+
+    let target_path = if !mono {
+        path.trim_end_matches(".zip").to_string()
+    } else {
+        format!("{}_temp", path.trim_end_matches(".zip"))
+    };
+    zip.extract(&target_path)
         .unwrap_or_else(|err| err!("Error when unzipping: ", err.to_string()));
+
+    if mono {
+        let mut subpath: Option<PathBuf> = None;
+        for dir in fs::read_dir(&target_path).unwrap() {
+            let path = dir.unwrap().path();
+            if path.is_dir() {
+                subpath = Some(path);
+                break;
+            }
+        }
+
+        if let Some(sp) = subpath {
+            let root = Path::new(path.trim_end_matches(".zip"));
+            fs::rename(sp, root).unwrap_or_else(|err| panic!("{}", err.to_string()));
+            fs::remove_dir_all(target_path).unwrap();
+        }
+    }
 }

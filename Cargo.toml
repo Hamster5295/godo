@@ -1,7 +1,11 @@
 [package]
 name = "godo"
 version = "0.1.0"
+authors = ["Hamster5295 <hamster5295@163.com>"]
 edition = "2021"
+description = "A version manager for Godot Engine."
+readme= "README.md"
+repository = "https://github.com/Hamster5295/godo"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
