@@ -1,16 +1,15 @@
 mod procedure;
 mod remote;
 mod utils;
+mod version;
 
 use std::fs;
 
 use clap::{Parser, Subcommand};
 use console::Style;
 use dialoguer::Confirm;
-use remote::get_download_info;
+use remote::search_version;
 use reqwest::Client;
-
-use crate::utils::{get_version_name_short, parse_version};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -72,8 +71,8 @@ fn handle_list() {
 
     let installed_dirs = utils::get_installed_dirs();
     for dir in installed_dirs {
-        let (ver, mono) = parse_version(&dir).unwrap();
-        println!("{}", get_version_name_short(&ver.to_string(), &mono));
+        let ver = version::parse(dir).unwrap();
+        println!("{}", ver.short_name());
     }
 }
 
@@ -93,11 +92,11 @@ async fn handle_install(version: &Option<String>, mono: &bool) {
 
     let client = Client::new();
 
-    match get_download_info(&client, version_str, *mono).await {
-        Some((tag, url)) => {
+    match search_version(&client, version_str, *mono).await {
+        Some((ver, url)) => {
             let proc = &mut procedure::new(4);
-            let version_name = utils::get_version_name(&tag, mono);
-            let file_name = utils::get_dir_name(&tag, mono);
+            let version_name = ver.version_name();
+            let file_name = ver.dir_name();
 
             // Confirm before download
             proc.next("Please confirm your installation:".to_string());
@@ -134,7 +133,7 @@ async fn handle_install(version: &Option<String>, mono: &bool) {
                 println!(
                     "Use {} {} to start.",
                     yellow.apply_to("godo run"),
-                    green.apply_to(&tag)
+                    green.apply_to(ver.tag())
                 );
             } else {
                 println!("{}", red.apply_to("Installation aborted"))

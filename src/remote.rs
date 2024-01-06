@@ -10,7 +10,10 @@ use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 use serde::Deserialize;
 
-use crate::utils;
+use crate::{
+    utils,
+    version::{self, Version},
+};
 
 macro_rules! err {
     ($title:tt, $content:expr) => {
@@ -95,13 +98,7 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
             )
             .unwrap();
         writer
-            .write(
-                format!(
-                    "{}",
-                    dim.apply_to("=".repeat(60) + "\n")
-                )
-                .as_bytes(),
-            )
+            .write(format!("{}", dim.apply_to("=".repeat(60) + "\n")).as_bytes())
             .unwrap();
         let mut ver4: Vec<Release> = vec![];
         let mut ver4_pre: Vec<Release> = vec![];
@@ -169,13 +166,7 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
             )
             .unwrap();
         writer
-            .write(
-                format!(
-                    "{}",
-                    dim.apply_to("=".repeat(30) + "\n")
-                )
-                .as_bytes(),
-            )
+            .write(format!("{}", dim.apply_to("=".repeat(30) + "\n")).as_bytes())
             .unwrap();
         let mut ver4: Vec<Release> = vec![];
         let mut ver3: Vec<Release> = vec![];
@@ -214,11 +205,11 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
     writer.flush().unwrap();
 }
 
-pub async fn get_download_info(
+pub async fn search_version(
     client: &Client,
     version: String,
     mono: bool,
-) -> Option<(String, String)> {
+) -> Option<(Version, String)> {
     let releases = get_all_releases(
         client,
         version.contains("-") && !version.ends_with("stable"),
@@ -273,7 +264,7 @@ pub async fn get_download_info(
         }) && item.name.contains("mono") == mono
         {
             return Some((
-                releases[result].tag_name.clone(),
+                version::new(releases[result].tag_name.to_string(), mono),
                 item.browser_download_url.clone(),
             ));
         }
