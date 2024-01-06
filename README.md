@@ -1,11 +1,20 @@
 # Godo
-A command-line tool for managing different versions of [Godot Engine](https://github.com/godotengine/godot)s.  
+A command-line tool for managing different versions of [Godot Engine](https://github.com/godotengine/godot).  
 
-Written in Rust.  
+Written in ***PURE*** Rust.  
 
 > [!NOTE]  
 >   
 > Currently **Godo** supports Windows only, and will soon catch up with macos and linux :D
+  
+## Setup
+1. Download the latest `.exe` executable at the [Releases Page](https://github.com/Hamster5295/godo/releases)
+2. Place it into an empty folder with a considerate name, e.g. `godo`
+3. Start Windows Powershell with Administrator's permission, then input:
+```Bash
+setx PATH path\to\godo /M
+```
+1. Run another cmd, and try the commands in ***Quick Start*** section out!
 
 ## Quick Start
 Install the latest stable version of Godot:
@@ -35,13 +44,13 @@ godo run 3
 ```  
   
 
-See what's available to install!
+See what's available to install:
 ```Bash
 godo available
 ```
   
 
-...with **prereleased** versions
+...with **prereleased** versions:
 ```Bash
 godo available -p
 ```
@@ -53,7 +62,7 @@ godo list
 ```  
   
 
-I don't want the version anymore!
+I don't want that version anymore!
 ```Bash
 godo uninstall 4.2-stable
 ```
