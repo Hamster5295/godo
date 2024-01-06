@@ -8,7 +8,7 @@ use std::fs;
 use clap::{Parser, Subcommand};
 use console::Style;
 use dialoguer::Confirm;
-use remote::search_version;
+use remote::search_remote_version;
 use reqwest::Client;
 
 #[derive(Parser)]
@@ -22,31 +22,35 @@ struct Args {
 enum Command {
     /// Install Godot with optional specific version.
     Install {
-        /// The version to install
+        /// The version to install.
         version: Option<String>,
 
-        /// Whether to install the Mono version (with C# support)
+        /// Whether to install the Mono version (with C# support).
         #[arg(short, long)]
         mono: bool,
     },
-    /// List all the available released versions
+    /// List available Godot versions.
     Available {
         /// Whether to list prereleased versions
         #[arg(short, long)]
         prerelease: bool,
     },
-    /// List all the installed versions
+    /// List installed Godot versions.
     List,
+    /// Run Godot with specific version.
+    Run {
+        /// The version to run. Automaticly runs the latest stable version when not specified.
+        version: Option<String>,
+
+        /// Whether to run the Mono version.
+        #[arg(short, long)]
+        mono: bool,
+    },
 }
 
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
-
-    // let cyan = Style::new().cyan().bold().bright();
-    // let yellow = Style::new().yellow().bold();
-    // let red = Style::new().red().bold();
-    // let green = Style::new().green().bold();
 
     match &args.command {
         Command::Install { version, mono } => {
@@ -54,6 +58,7 @@ async fn main() {
         }
         Command::Available { prerelease } => handle_available(prerelease).await,
         Command::List => handle_list(),
+        Command::Run { version, mono } => handle_run(version, mono),
     }
 }
 
@@ -71,8 +76,15 @@ fn handle_list() {
 
     let installed_dirs = utils::get_installed_dirs();
     for dir in installed_dirs {
-        let ver = version::parse(dir).unwrap();
-        println!("{}", ver.short_name());
+        if let Some(ver) = version::parse(dir) {
+            println!("{}", ver.short_name());
+        }
+    }
+}
+
+fn handle_run(version: &Option<String>, mono: &bool) {
+    if let Some(ver) = utils::search_installed_version(version, *mono) {
+        println!("{}", ver.version_name())
     }
 }
 
@@ -82,17 +94,8 @@ async fn handle_install(version: &Option<String>, mono: &bool) {
     let red = Style::new().red().bold();
     let green = Style::new().green().bold();
 
-    let version_str: String;
-    match version {
-        Some(ver) => {
-            version_str = ver.clone();
-        }
-        None => version_str = "4".to_string(),
-    }
-
     let client = Client::new();
-
-    match search_version(&client, version_str, *mono).await {
+    match search_remote_version(&client, version, *mono).await {
         Some((ver, url)) => {
             let proc = &mut procedure::new(4);
             let version_name = ver.version_name();

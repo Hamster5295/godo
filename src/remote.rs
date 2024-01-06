@@ -205,32 +205,36 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
     writer.flush().unwrap();
 }
 
-pub async fn search_version(
+pub async fn search_remote_version(
     client: &Client,
-    version: String,
+    version: &Option<String>,
     mono: bool,
 ) -> Option<(Version, String)> {
-    let releases = get_all_releases(
-        client,
-        version.contains("-") && !version.ends_with("stable"),
-    )
-    .await;
-    let result = {
-        let mut idx = 0;
-        let mut flag = false;
-        for item in &releases {
-            if item.tag_name.starts_with(version.as_str()) {
-                flag = true;
-                break;
+    let result: usize;
+    let releases: Vec<Release>;
+    if let Some(ver) = version {
+        releases = get_all_releases(client, ver.contains("-") && !ver.ends_with("stable")).await;
+        result = {
+            let mut idx = 0;
+            let mut flag = false;
+            for item in &releases {
+                if item.tag_name.starts_with(ver) {
+                    flag = true;
+                    break;
+                }
+                idx += 1;
             }
-            idx += 1;
-        }
-        if flag {
-            idx
-        } else {
-            return None;
-        }
+            if flag {
+                idx
+            } else {
+                return None;
+            }
+        };
+    } else {
+        releases = get_all_releases(client, false).await;
+        result = 0;
     };
+
     for item in &releases[result].assets {
         if item.name.contains(match consts::OS {
             "windows" => "win",

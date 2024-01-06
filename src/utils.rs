@@ -1,5 +1,7 @@
 use console::style;
-use std::fs;
+use std::{cmp::Ordering, fs};
+
+use crate::version::{self, Version};
 
 pub const INSTALL_PATH: &str = "downloads";
 
@@ -30,4 +32,62 @@ pub fn get_installed_dirs() -> Vec<String> {
         }
     }
     installs
+}
+
+pub fn search_installed_version(keyword: &Option<String>, mono: bool) -> Option<Version> {
+    let dirs = get_installed_dirs();
+    match keyword {
+        Some(version) => {
+            // Search based on the keyword
+            search_installed_version_with_dirs(mono, dirs, |ver| ver.tag().starts_with(version))
+        }
+        None => {
+            // No keyword, find the latest stable version
+            search_installed_version_with_dirs(mono, dirs, |_ver| true)
+        }
+    }
+}
+
+fn search_installed_version_with_dirs<F>(
+    mono: bool,
+    dirs: Vec<String>,
+    condition: F,
+) -> Option<Version>
+where
+    F: Fn(&Version) -> bool,
+{
+    let mut result: Option<Version> = None;
+    for dir in dirs {
+        if let Some(ver) = version::parse(dir) {
+            // Fit the keyword
+            if condition(&ver) {
+                if mono && !ver.mono() {
+                    continue;
+                }
+
+                if let Some(ref cur_ver) = result {
+                    if cur_ver.tag().ends_with("stable") && !ver.tag().ends_with("stable") {
+                        continue;
+                    }
+
+                    match version::compare(ver.tag(), cur_ver.tag()) {
+                        Ordering::Equal => {
+                            if !cur_ver.mono() && ver.mono() {
+                                result = Some(ver);
+                            }
+                        }
+                        Ordering::Greater => {
+                            result = Some(ver);
+                        }
+                        Ordering::Less => {
+                            continue;
+                        }
+                    }
+                } else {
+                    result = Some(ver);
+                }
+            }
+        }
+    }
+    result
 }
