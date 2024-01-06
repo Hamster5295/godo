@@ -1,5 +1,5 @@
 use console::style;
-use std::{cmp::Ordering, fs};
+use std::{cmp::Ordering, fs, path::Path};
 
 use crate::version::{self, Version};
 
@@ -34,8 +34,41 @@ pub fn get_installed_dirs() -> Vec<String> {
     installs
 }
 
+pub fn get_executables(dir: String) -> Vec<String> {
+    let mut files = vec![];
+
+    for dir_result in fs::read_dir(Path::new(INSTALL_PATH).join(dir)).unwrap() {
+        let dir = dir_result.unwrap();
+        let path = dir.path();
+        if path.is_file() {
+            files.push(path.to_str().unwrap().to_owned());
+        }
+    }
+
+    files
+}
+
+pub fn get_executable(dir: String, console: bool) -> Option<String> {
+    let files = get_executables(dir);
+    let mut result: Option<String> = None;
+    for file in files {
+        if console && !file.contains("console") {
+            continue;
+        }
+
+        if let Some(ref res) = result {
+            if res.contains("console") && !file.contains("console") {
+                result = Some(file);
+            }
+        } else {
+            result = Some(file);
+        }
+    }
+    result
+}
+
 pub fn search_installed_version(keyword: &Option<String>, mono: bool) -> Option<Version> {
-    let dirs = get_installed_dirs();
+    let dirs: Vec<String> = get_installed_dirs();
     match keyword {
         Some(version) => {
             // Search based on the keyword
