@@ -10,11 +10,11 @@ Written in ***PURE*** Rust.
 ## Setup
 1. Download the latest `.exe` executable at the [Releases Page](https://github.com/Hamster5295/godo/releases)
 2. Place it into an empty folder with a considerate name, e.g. `godo`
-3. Start Windows Powershell with Administrator's permission, then input:
+3. Run command below from a cmd or a PowerShell:
 ```Bash
-setx PATH path\to\godo /M
+setx "PATH" "%PATH%;path\to\godo"
 ```
-1. Run another cmd, and try the commands in ***Quick Start*** section out!
+4. Run another cmd, and try the commands in ***Quick Start*** section out!
 
 ## Quick Start
 Install the latest stable version of Godot:
