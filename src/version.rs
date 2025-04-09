@@ -61,7 +61,7 @@ impl Version {
     }
 
     pub fn short_name(&self) -> String {
-        let mut result = format!("{}", self.tag);
+        let mut result = self.tag.to_string();
         if self.mono {
             result += " mono";
         }

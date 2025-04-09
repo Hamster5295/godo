@@ -87,7 +87,7 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
 
     if prerelease {
         writer
-            .write(
+            .write_all(
                 format!(
                     "{:15}{:15}{:15}{:15}\n",
                     yellow.apply_to("Godot4"),
@@ -99,7 +99,7 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
             )
             .unwrap();
         writer
-            .write(format!("{}", dim.apply_to("=".repeat(60) + "\n")).as_bytes())
+            .write_all(format!("{}", dim.apply_to("=".repeat(60) + "\n")).as_bytes())
             .unwrap();
         let mut ver4: Vec<Release> = vec![];
         let mut ver4_pre: Vec<Release> = vec![];
@@ -112,12 +112,10 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
                 } else {
                     ver4_pre.push(ver)
                 }
+            } else if ver.tag_name.ends_with("stable") {
+                ver3.push(ver);
             } else {
-                if ver.tag_name.ends_with("stable") {
-                    ver3.push(ver);
-                } else {
-                    ver3_pre.push(ver)
-                }
+                ver3_pre.push(ver)
             }
         }
 
@@ -127,7 +125,7 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
 
         for i in 0..lenth {
             writer
-                .write(
+                .write_all(
                     format!(
                         "{:15}{:15}{:15}{:15}\n",
                         if ver4.len() > i {
@@ -157,7 +155,7 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
         }
     } else {
         writer
-            .write(
+            .write_all(
                 format!(
                     "{:15}{:15}\n",
                     yellow.apply_to("Godot4"),
@@ -167,7 +165,7 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
             )
             .unwrap();
         writer
-            .write(format!("{}", dim.apply_to("=".repeat(30) + "\n")).as_bytes())
+            .write_all(format!("{}", dim.apply_to("=".repeat(30) + "\n")).as_bytes())
             .unwrap();
         let mut ver4: Vec<Release> = vec![];
         let mut ver3: Vec<Release> = vec![];
@@ -183,7 +181,7 @@ pub async fn list_avail(client: &Client, prerelease: bool) {
 
         for i in 0..lenth {
             writer
-                .write(
+                .write_all(
                     format!(
                         "{:15}{:15}\n",
                         if ver4.len() > i {
@@ -304,6 +302,7 @@ pub async fn download(client: &Client, file_name: String, url: String) -> String
     let mut writer = io::BufWriter::new(
         fs::OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(&path)
             .unwrap_or_else(|err| match err.kind() {
@@ -336,7 +335,7 @@ pub async fn download(client: &Client, file_name: String, url: String) -> String
         .await
         .unwrap_or_else(|err| err!("Error when downloading: ", err.to_string()))
     {
-        writer.write(&content).unwrap();
+        writer.write_all(&content).unwrap();
         bar.inc(content.len() as u64);
     }
 
@@ -348,7 +347,7 @@ pub fn unzip(path: &String, mono: bool) {
     let mut zip = zip::ZipArchive::new(BufReader::new(
         fs::OpenOptions::new()
             .read(true)
-            .open(&path)
+            .open(path)
             .unwrap_or_else(|err| err!("Error with zipped file: ", err.to_string())),
     ))
     .unwrap();

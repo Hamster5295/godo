@@ -23,7 +23,7 @@ impl Procedure {
         println!("{} {}", self.get_step(), msg)
     }
 
-    fn get_step(&self) -> StyledObject<std::string::String> {
+    fn get_step(&self) -> StyledObject<String> {
         style(format!("[{}/{}]", self.step, self.max_steps)).dim()
-    }
+    }   
 }
