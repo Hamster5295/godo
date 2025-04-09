@@ -95,7 +95,7 @@ fn handle_list() {
     println!("{}", dim.apply_to("=".repeat(15)));
 
     let installed_dirs = utils::get_installed_dirs();
-    if installed_dirs.len() > 0 {
+    if !installed_dirs.is_empty() {
         for dir in installed_dirs {
             if let Some(ver) = version::parse(dir) {
                 println!("{}", ver.short_name());
@@ -111,14 +111,16 @@ async fn handle_run(version: &Option<String>, mono: &Option<bool>, console: &boo
 
     if let Some(ver) = utils::search_installed_version(version, *mono) {
         if let Some(exec) = utils::get_executable(ver.dir_name(), *console) {
-            tokio::process::Command::new(exec).spawn().expect(
-                format!(
-                    "{} {}",
-                    red.apply_to("Failed to run"),
-                    red.apply_to(ver.version_name())
-                )
-                .as_str(),
-            );
+            tokio::process::Command::new(exec)
+                .spawn()
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "{} {}: {}",
+                        red.apply_to("Failed to run"),
+                        red.apply_to(ver.version_name()),
+                        e
+                    )
+                });
         }
     } else {
         println!("{}", red.apply_to("No installed version found."));
@@ -156,9 +158,8 @@ async fn handle_install(version: &Option<String>, mono: &bool) {
             let installed = utils::get_installed_versions();
             if installed.contains(&ver) {
                 println!(
-                    "{} {}",
+                    "{} has been installed already.",
                     cyan.apply_to(ver.version_name()),
-                    "has been installed already."
                 );
                 println!(
                     "Use {} to list the installed versions.",

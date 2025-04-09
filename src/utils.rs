@@ -1,13 +1,9 @@
 use console::style;
-use std::{
-    cmp::Ordering,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{cmp::Ordering, fs, path::PathBuf};
 
 use crate::version::{self, Version};
 
-pub const INSTALL_PATH: &str = "downloads";
+pub const INSTALL_PATH: &str = "app";
 
 #[macro_export]
 macro_rules! err {
@@ -81,10 +77,8 @@ pub fn get_executable(dir: String, console: bool) -> Option<String> {
                 if res.contains("console") && !file.contains("console") {
                     result = Some(file);
                 }
-            } else {
-                if !res.contains("console") && file.contains("console") {
-                    result = Some(file);
-                }
+            } else if !res.contains("console") && file.contains("console") {
+                result = Some(file);
             }
         } else {
             result = Some(file);
