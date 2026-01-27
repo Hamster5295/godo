@@ -21,6 +21,10 @@ pub fn get_install_path() -> PathBuf {
         .with_file_name(INSTALL_PATH)
 }
 
+pub fn get_current_path() -> PathBuf {
+    std::env::current_exe().unwrap().with_file_name("")
+}
+
 pub fn create_install_path() {
     fs::create_dir_all(get_install_path())
         .unwrap_or_else(|err| err!("Unable to create install directory: ", err.to_string()));
@@ -74,10 +78,10 @@ pub fn get_executable(dir: String, console: bool) -> Option<String> {
 
         if let Some(ref res) = result {
             if console {
-                if res.contains("console") && !file.contains("console") {
+                if !res.contains("console") && file.contains("console") {
                     result = Some(file);
                 }
-            } else if !res.contains("console") && file.contains("console") {
+            } else if res.contains("console") && !file.contains("console") {
                 result = Some(file);
             }
         } else {

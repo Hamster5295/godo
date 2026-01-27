@@ -10,6 +10,7 @@ use console::Style;
 use dialoguer::Confirm;
 use remote::search_remote_version;
 use reqwest::Client;
+use symlink::{remove_symlink_dir, remove_symlink_file, symlink_dir, symlink_file};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -63,6 +64,16 @@ enum CliCommand {
         #[arg(short, long)]
         console: bool,
     },
+
+    /// Create a symbolic link 'current' pointing to specified version
+    Current {
+        /// The version to run. Automaticly runs the latest stable version when not specified.
+        version: Option<String>,
+
+        /// Whether to run the Mono version.
+        #[arg(short, long)]
+        mono: bool,
+    },
 }
 
 #[tokio::main]
@@ -79,6 +90,7 @@ async fn main() {
             mono,
             console,
         } => handle_run(version, mono, console).await,
+        CliCommand::Current { version, mono } => handle_current(version, mono.clone()),
     }
 }
 
@@ -272,6 +284,50 @@ fn handle_uninstall(version: &Option<String>, mono: &bool) {
             proc.finish("Uninstalled!".to_string());
         } else {
             println!("{}", red.apply_to("Aborted."))
+        }
+    } else {
+        println!("{}", red.apply_to("No installed version found."));
+    }
+}
+
+fn handle_current(version: &Option<String>, mono: bool) {
+    let red = Style::new().red().bold();
+    let green = Style::new().green().bold();
+    if let Some(ver) = utils::search_installed_version(version, Some(mono)) {
+        let folder = utils::get_current_path().join("current");
+        let exec = utils::get_current_path().join("godot.exe");
+        if fs::exists(&folder).unwrap() {
+            remove_symlink_dir(&folder).unwrap();
+        }
+        if fs::exists(&exec).unwrap() {
+            remove_symlink_file(&exec).unwrap();
+        }
+
+        if let Ok(_) = symlink_dir(utils::get_install_path().join(ver.dir_name()), &folder) {
+            println!(
+                "- {} linked to {}",
+                green.apply_to(ver.dir_name()),
+                green.apply_to("current")
+            )
+        } else {
+            println!(
+                "{}",
+                red.apply_to("Failed to create symbolic link for godot executable folder")
+            );
+        }
+
+        let src = utils::get_executable(ver.dir_name(), false).unwrap();
+        if let Ok(_) = symlink_file(&src, &exec) {
+            println!(
+                "- {} linked to {}",
+                green.apply_to("Executable"),
+                green.apply_to("godot.exe")
+            )
+        } else {
+            println!(
+                "{}",
+                red.apply_to("Failed to create symbolic link for executable")
+            );
         }
     } else {
         println!("{}", red.apply_to("No installed version found."));

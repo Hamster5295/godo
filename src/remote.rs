@@ -45,7 +45,7 @@ async fn get_releases(client: &Client, prerelease: bool) -> Vec<Release> {
         } else {
             "https://api.github.com/repos/godotengine/godot/releases"
         })
-        .header("User-Agent", "Hamster5295");
+        .header("User-Agent", "godo");
     let response = req
         .send()
         .await
