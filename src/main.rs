@@ -295,38 +295,60 @@ fn handle_current(version: &Option<String>, mono: bool) {
     let green = Style::new().green().bold();
     if let Some(ver) = utils::search_installed_version(version, Some(mono)) {
         let folder = utils::get_current_path().join("current");
+        let gdsharp = utils::get_current_path().join("GodotSharp");
         let exec = utils::get_current_path().join("godot.exe");
         if fs::exists(&folder).unwrap() {
             remove_symlink_dir(&folder).unwrap();
+        }
+        if fs::exists(&gdsharp).unwrap() {
+            remove_symlink_dir(&gdsharp).unwrap();
         }
         if fs::exists(&exec).unwrap() {
             remove_symlink_file(&exec).unwrap();
         }
 
-        if let Ok(_) = symlink_dir(utils::get_install_path().join(ver.dir_name()), &folder) {
+        if let Err(e) = symlink_dir(utils::get_install_path().join(ver.dir_name()), &folder) {
+            println!(
+                "{}: {e}",
+                red.apply_to("Failed to create symbolic link for godot executable folder")
+            );
+        } else {
             println!(
                 "- {} linked to {}",
                 green.apply_to(ver.dir_name()),
                 green.apply_to("current")
-            )
+            );
+        }
+
+        if let Err(e) = symlink_dir(
+            utils::get_install_path()
+                .join(ver.dir_name())
+                .join("GodotSharp"),
+            &gdsharp,
+        ) {
+            println!(
+                "{}: {e}",
+                red.apply_to("Failed to create symbolic link for GodotSharp folder")
+            );
         } else {
             println!(
-                "{}",
-                red.apply_to("Failed to create symbolic link for godot executable folder")
+                "- {} linked to {}",
+                green.apply_to(format!("{}/{}", ver.dir_name(), "GodotSharp")),
+                green.apply_to("GodotSharp")
             );
         }
 
         let src = utils::get_executable(ver.dir_name(), false).unwrap();
-        if let Ok(_) = symlink_file(&src, &exec) {
+        if let Err(e) = symlink_file(&src, &exec) {
+            println!(
+                "{}: {e}",
+                red.apply_to("Failed to create symbolic link for executable")
+            );
+        } else {
             println!(
                 "- {} linked to {}",
                 green.apply_to("Executable"),
                 green.apply_to("godot.exe")
-            )
-        } else {
-            println!(
-                "{}",
-                red.apply_to("Failed to create symbolic link for executable")
             );
         }
     } else {
