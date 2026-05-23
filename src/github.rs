@@ -68,24 +68,21 @@ fn fetch_releases_from(base_url: &str, token: Option<&str>) -> Result<Vec<Github
     let mut all_releases = Vec::new();
     let mut page = 1;
 
+    let agent = ureq::agent();
+
     loop {
         let url = format!("{base_url}?per_page=100&page={page}");
-        let mut request = ureq::AgentBuilder::new()
-            .user_agent("godo - Godot Version Manager")
-            .build()
-            .get(&url);
+        let mut request = agent.get(&url);
 
-        request = request.set("X-GitHub-Api-Version", "2026-03-10");
         if let Some(t) = token {
-            request = request.set("Authorization", &format!("Bearer {t}"));
+            request = request.header("Authorization", &format!("Bearer {t}"));
         }
 
-        let response = request
+        let mut response = request
             .call()
             .context("Failed to fetch releases from GitHub")?;
 
-        let body = response
-            .into_string()
+        let body = response.body_mut().read_to_string()
             .context("Failed to read response body")?;
         let releases: Vec<GithubRelease> =
             serde_json::from_str(&body).context("Failed to parse GitHub response")?;

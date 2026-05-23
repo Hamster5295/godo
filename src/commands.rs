@@ -612,9 +612,7 @@ fn download_with_progress(url: &str, dest: &Path, expected_size: u64) -> Result<
         url.split('/').last().unwrap_or("file")
     );
 
-    let response = ureq::AgentBuilder::new()
-        .user_agent("godo - Godot Version Manager")
-        .build()
+    let mut response = ureq::agent()
         .get(url)
         .call()
         .context("Failed to download file")?;
@@ -623,7 +621,9 @@ fn download_with_progress(url: &str, dest: &Path, expected_size: u64) -> Result<
         expected_size
     } else {
         response
-            .header("Content-Length")
+            .headers()
+            .get("Content-Length")
+            .and_then(|v| v.to_str().ok())
             .and_then(|s| s.parse().ok())
             .unwrap_or(0)
     };
@@ -637,7 +637,7 @@ fn download_with_progress(url: &str, dest: &Path, expected_size: u64) -> Result<
         .progress_chars("#>-"),
     );
 
-    let mut reader = response.into_reader();
+    let mut reader = response.body_mut().as_reader();
     let mut file = std::fs::File::create(dest).context("Failed to create temp file")?;
     let mut buf = [0u8; 8192];
     let mut downloaded: u64 = 0;
