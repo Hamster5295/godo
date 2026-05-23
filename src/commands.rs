@@ -744,24 +744,16 @@ fn rename_executables(dir: &Path) -> Result<()> {
             continue;
         }
 
-        let name = path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_lowercase();
+        let name = path.file_name().unwrap_or_default().to_string_lossy();
 
-        if name.contains("console") && !name.starts_with("godot") {
-            let new_path = dir.join(&console_name);
-            std::fs::rename(&path, &new_path)?;
-        } else if !name.contains("console")
-            && !name.starts_with("godot")
-            && !name.contains("godotsharp")
-            && !name.ends_with(".dll")
-            && !name.ends_with(".so")
-            && !name.ends_with(".dylib")
-        {
-            let new_path = dir.join(&godot_name);
-            std::fs::rename(&path, &new_path)?;
+        if name.starts_with("Godot_") {
+            if name.contains("console") {
+                let new_path = dir.join(&console_name);
+                std::fs::rename(&path, &new_path)?;
+            } else {
+                let new_path = dir.join(&godot_name);
+                std::fs::rename(&path, &new_path)?;
+            }
         }
     }
 
