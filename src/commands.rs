@@ -272,13 +272,16 @@ pub fn list(config: &Config, beta: bool) -> Result<()> {
         })
         .collect();
 
-    // Print rows row-by-row across all columns
+    // Print rows row-by-row across all columns, bottom-aligned
     let max_rows = groups.iter().map(|(_, v)| v.len()).max().unwrap_or(0);
     for row in 0..max_rows {
         let mut cells = Vec::new();
         for ((_, vers), col_w) in groups.iter().zip(col_widths.iter()) {
-            if row < vers.len() {
-                let ver = &vers[row];
+            let offset = max_rows - vers.len();
+            let data_row: Option<usize> = row.checked_sub(offset);
+
+            if let Some(idx) = data_row {
+                let ver = &vers[idx];
                 let is_installed = installed_folders.contains(&ver.folder_name());
                 let is_current = current_folder.as_deref() == Some(ver.folder_name().as_str());
 
@@ -812,9 +815,9 @@ fn cleanup_temp(temp_dir: &Path, filename: &str) {
     }
 }
 
-pub fn update() -> Result<()> {
+pub fn update(config: &Config) -> Result<()> {
     println!("{}", "Updating manifest from GitHub...".dimmed());
-    let releases = github::fetch_releases_remote()?;
+    let releases = github::fetch_releases_remote(config.github_token.as_deref())?;
     println!(
         "  {} Fetched {} releases",
         "✓".green(),

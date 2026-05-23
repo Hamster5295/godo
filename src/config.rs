@@ -9,6 +9,9 @@ pub struct Config {
     /// Cache invalidation time in seconds. Default: 10800 (3 hours)
     #[serde(default = "default_invalidate_time")]
     pub invalidate_time: u64,
+    /// GitHub personal access token for API authentication. Optional but recommended to avoid rate limits.
+    #[serde(default)]
+    pub github_token: Option<String>,
 }
 
 fn default_invalidate_time() -> u64 {
@@ -70,6 +73,7 @@ impl Config {
             engine_dir: godo_dir.join("engine"),
             temp_dir,
             invalidate_time: default_invalidate_time(),
+            github_token: None,
         }
     }
 

@@ -113,7 +113,7 @@ fn main() {
             silent,
         } => commands::current(&config, &version, mono, silent),
         Commands::Run { version, mono } => commands::run(&config, version.as_deref(), mono),
-        Commands::Update => commands::update(),
+        Commands::Update => commands::update(&config),
     };
 
     if let Err(e) = result {

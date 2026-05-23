@@ -28,22 +28,22 @@ pub fn fetch_releases_cached(config: &crate::config::Config) -> Result<Vec<Githu
             .context("Failed to get manifest modification time")?;
         let elapsed = modified.elapsed().unwrap_or(std::time::Duration::MAX);
         if elapsed.as_secs() < config.invalidate_time {
-            let content = std::fs::read_to_string(&manifest_path)
-                .context("Failed to read manifest cache")?;
+            let content =
+                std::fs::read_to_string(&manifest_path).context("Failed to read manifest cache")?;
             let releases: Vec<GithubRelease> =
                 serde_json::from_str(&content).context("Failed to parse manifest cache")?;
             return Ok(releases);
         }
     }
 
-    let releases = fetch_releases_remote()?;
+    let releases = fetch_releases_remote(config.github_token.as_deref())?;
     save_manifest(&releases)?;
     Ok(releases)
 }
 
-pub fn fetch_releases_remote() -> Result<Vec<GithubRelease>> {
-    let godot_releases = fetch_releases_from(GITHUB_API_GODOT)?;
-    let builds_releases = fetch_releases_from(GITHUB_API_BUILDS)?;
+pub fn fetch_releases_remote(token: Option<&str>) -> Result<Vec<GithubRelease>> {
+    let godot_releases = fetch_releases_from(GITHUB_API_GODOT, token)?;
+    let builds_releases = fetch_releases_from(GITHUB_API_BUILDS, token)?;
 
     let mut seen = std::collections::HashSet::new();
     let mut all_releases = Vec::new();
@@ -64,20 +64,29 @@ fn save_manifest(releases: &[GithubRelease]) -> Result<()> {
     Ok(())
 }
 
-fn fetch_releases_from(base_url: &str) -> Result<Vec<GithubRelease>> {
+fn fetch_releases_from(base_url: &str, token: Option<&str>) -> Result<Vec<GithubRelease>> {
     let mut all_releases = Vec::new();
     let mut page = 1;
 
     loop {
         let url = format!("{base_url}?per_page=100&page={page}");
-        let response = ureq::AgentBuilder::new()
+        let mut request = ureq::AgentBuilder::new()
             .user_agent("godo - Godot Version Manager")
             .build()
-            .get(&url)
+            .get(&url);
+
+        request = request.set("X-GitHub-Api-Version", "2026-03-10");
+        if let Some(t) = token {
+            request = request.set("Authorization", &format!("Bearer {t}"));
+        }
+
+        let response = request
             .call()
             .context("Failed to fetch releases from GitHub")?;
 
-        let body = response.into_string().context("Failed to read response body")?;
+        let body = response
+            .into_string()
+            .context("Failed to read response body")?;
         let releases: Vec<GithubRelease> =
             serde_json::from_str(&body).context("Failed to parse GitHub response")?;
 
@@ -188,7 +197,9 @@ fn is_main_platform_asset(name: &str, mono: bool, os: &str, arch: &str) -> bool 
     match os {
         "linux" => {
             let arch_match = match arch {
-                "x86_64" => lower.contains("x86_64") || lower.contains("x64") || lower.contains(".64"),
+                "x86_64" => {
+                    lower.contains("x86_64") || lower.contains("x64") || lower.contains(".64")
+                }
                 "aarch64" => lower.contains("arm64") || lower.contains("aarch64"),
                 _ => false,
             };
@@ -196,17 +207,21 @@ fn is_main_platform_asset(name: &str, mono: bool, os: &str, arch: &str) -> bool 
         }
         "macos" => {
             let os_match = lower.contains("macos") || lower.contains("osx");
-            let arch_match = lower.contains("universal") || match arch {
-                "x86_64" => lower.contains("x86_64") || lower.contains("x64") || lower.contains(".64"),
-                "aarch64" => lower.contains("arm64") || lower.contains("aarch64"),
-                _ => false,
-            };
+            let arch_match = lower.contains("universal")
+                || match arch {
+                    "x86_64" => {
+                        lower.contains("x86_64") || lower.contains("x64") || lower.contains(".64")
+                    }
+                    "aarch64" => lower.contains("arm64") || lower.contains("aarch64"),
+                    _ => false,
+                };
             os_match && arch_match
         }
         "windows" => {
             let arch_match = match arch {
-                "x86_64" => (lower.contains("win64") || lower.contains("win64"))
-                    && !lower.contains("arm64"),
+                "x86_64" => {
+                    (lower.contains("win64") || lower.contains("win64")) && !lower.contains("arm64")
+                }
                 "aarch64" => lower.contains("arm64"),
                 _ => false,
             };
