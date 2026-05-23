@@ -42,14 +42,12 @@ impl Config {
 
         let config_path = Self::config_path();
         if config_path.exists() {
-            let content = std::fs::read_to_string(&config_path)
-                .context("Failed to read config file")?;
-            let config: Config =
-                toml::from_str(&content).context("Failed to parse config file")?;
+            let content =
+                std::fs::read_to_string(&config_path).context("Failed to read config file")?;
+            let config: Config = toml::from_str(&content).context("Failed to parse config file")?;
             std::fs::create_dir_all(&config.engine_dir)
                 .context("Failed to create engine directory")?;
-            std::fs::create_dir_all(&config.temp_dir)
-                .context("Failed to create temp directory")?;
+            std::fs::create_dir_all(&config.temp_dir).context("Failed to create temp directory")?;
             Ok(config)
         } else {
             let config = Config::default_config();

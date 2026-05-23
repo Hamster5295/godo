@@ -18,7 +18,6 @@ struct Cli {
 enum Commands {
     /// Install Godot Engine with specific version
     Install {
-
         /// The version to install. Fuzzy matching is supported.
         version: String,
 
@@ -33,7 +32,6 @@ enum Commands {
 
     /// Remove a locally installed Godot version
     Rm {
-
         /// The version to remove. Fuzzy matching is supported.
         version: String,
 
@@ -45,10 +43,9 @@ enum Commands {
         #[arg(long)]
         silent: bool,
     },
-    
+
     /// List all available Godot versions
     List {
-
         /// Show pre-release versions (beta, rc, dev, alpha)
         #[arg(long)]
         beta: bool,
@@ -56,7 +53,6 @@ enum Commands {
 
     /// Set the current active Godot version
     Current {
-
         /// The version to set as current. Fuzzy matching is supported.
         version: String,
 
@@ -71,10 +67,9 @@ enum Commands {
 
     /// Launch a Godot Engine instance
     Run {
-
         /// The version to launch. Defaults to current if omitted. Fuzzy matching is supported.
         version: Option<String>,
-        
+
         /// Whether to launch Mono version
         #[arg(long, num_args = 0..=1, default_missing_value = "true")]
         mono: Option<bool>,

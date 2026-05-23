@@ -82,7 +82,9 @@ fn fetch_releases_from(base_url: &str, token: Option<&str>) -> Result<Vec<Github
             .call()
             .context("Failed to fetch releases from GitHub")?;
 
-        let body = response.body_mut().read_to_string()
+        let body = response
+            .body_mut()
+            .read_to_string()
             .context("Failed to read response body")?;
         let releases: Vec<GithubRelease> =
             serde_json::from_str(&body).context("Failed to parse GitHub response")?;
