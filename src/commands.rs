@@ -734,7 +734,7 @@ fn rename_executables(dir: &Path) -> Result<()> {
     };
 
     let godot_name = format!("godot{exe_ext}");
-    let console_name = format!("godot-console{exe_ext}");
+    let console_name = format!("godot-console");
 
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
