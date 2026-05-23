@@ -355,7 +355,7 @@ pub fn list(config: &Config, beta: bool) -> Result<()> {
         .iter()
         .zip(col_widths.iter())
         .map(|((major, _), w)| {
-            let header = format!("Godot {major}");
+            let header = format!(" Godot {major}");
             let padding = *w - header.len();
             format!("{}{:padding$}", header.bold(), "")
         })
