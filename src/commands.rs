@@ -215,7 +215,17 @@ pub fn list(config: &Config, beta: bool) -> Result<()> {
     };
 
     let installed = get_installed_versions(config)?;
-    let installed_folders: Vec<String> = installed.iter().map(|v| v.folder_name()).collect();
+    let installed_keys: Vec<String> = installed.iter().map(|v| v.version_key()).collect();
+    let installed_std: std::collections::HashSet<String> = installed
+        .iter()
+        .filter(|v| !v.mono)
+        .map(|v| v.version_key())
+        .collect();
+    let installed_mono: std::collections::HashSet<String> = installed
+        .iter()
+        .filter(|v| v.mono)
+        .map(|v| v.version_key())
+        .collect();
 
     let current_folder = read_current_link(config);
 
@@ -228,12 +238,12 @@ pub fn list(config: &Config, beta: bool) -> Result<()> {
         .iter()
         .filter_map(|r| GodotVersion::from_tag(&r.tag_name))
         .collect();
-    versions.sort_by(|a, b| a.cmp(b));
+    versions.sort();
     versions.dedup();
 
     let filtered: Vec<GodotVersion> = versions
         .into_iter()
-        .filter(|ver| beta || ver.is_stable() || installed_folders.contains(&ver.folder_name()))
+        .filter(|ver| beta || ver.is_stable() || installed_keys.contains(&ver.version_key()))
         .collect();
 
     let mut groups: std::collections::BTreeMap<u32, Vec<GodotVersion>> =
@@ -245,8 +255,29 @@ pub fn list(config: &Config, beta: bool) -> Result<()> {
     // Reverse BTreeMap order so newest major comes first
     let groups: Vec<(u32, Vec<GodotVersion>)> = groups.into_iter().rev().collect();
 
+    #[derive(Clone, Copy)]
+    enum InstallState {
+        None,
+        Standard,
+        Mono,
+        Both,
+    }
+
+    let install_state = |v: &GodotVersion| -> InstallState {
+        let key = v.version_key();
+        let has_std = installed_std.contains(&key);
+        let has_mono = installed_mono.contains(&key);
+        match (has_std, has_mono) {
+            (true, true) => InstallState::Both,
+            (true, false) => InstallState::Standard,
+            (false, true) => InstallState::Mono,
+            (false, false) => InstallState::None,
+        }
+    };
+
     let col_gap = 2;
     // Compute column widths based on visible char width (excluding ANSI escapes)
+    // Bullet slot is always 3 chars wide: " ● " or "[●]", so ● aligns vertically
     let col_widths: Vec<usize> = groups
         .iter()
         .map(|(major, vers)| {
@@ -254,17 +285,8 @@ pub fn list(config: &Config, beta: bool) -> Result<()> {
             let max_ver_len = vers
                 .iter()
                 .map(|v| {
-                    let base = v.to_string().len(); // visible chars, no ANSI
-                    let bullet_and_space = 2; // "● " or "○ "
-                    let current_extra = if current_folder.as_deref()
-                        == Some(v.folder_name().as_str())
-                        && installed_folders.contains(&v.folder_name())
-                    {
-                        10 // " (current)"
-                    } else {
-                        0
-                    };
-                    bullet_and_space + base + current_extra
+                    let base = v.to_string().len();
+                    3 + base // 3 = bullet slot " ● " or "[●]"
                 })
                 .max()
                 .unwrap_or(0);
@@ -282,23 +304,36 @@ pub fn list(config: &Config, beta: bool) -> Result<()> {
 
             if let Some(idx) = data_row {
                 let ver = &vers[idx];
-                let is_installed = installed_folders.contains(&ver.folder_name());
-                let is_current = current_folder.as_deref() == Some(ver.folder_name().as_str());
+                let state = install_state(ver);
+                let is_current = installed.iter().any(|iv| {
+                    iv.folder_name() == current_folder.as_deref().unwrap_or("")
+                        && iv.version_key() == ver.version_key()
+                });
 
-                let visible_len;
-                let text = if is_installed {
-                    let current_marker = if is_current { " (current)" } else { "" };
-                    visible_len = 2 + ver.to_string().len() + current_marker.len();
-                    format!(
-                        "{} {}{}",
-                        "●".green(),
-                        ver.to_string().green().bold(),
-                        current_marker.green()
-                    )
-                } else {
-                    visible_len = 2 + ver.to_string().len();
-                    format!("{} {}", "○".dimmed(), ver.to_string().dimmed())
+                let visible_len = 3 + ver.to_string().len();
+                let text = match state {
+                    InstallState::None => {
+                        format!("{} {}", "○".dimmed(), ver.to_string().dimmed())
+                    }
+                    InstallState::Standard => {
+                        let bullet = format!("{}", "●".green());
+                        format!("{} {}", bullet, ver.to_string().green().bold())
+                    }
+                    InstallState::Mono => {
+                        let bullet = format!("{}", "●".cyan());
+                        format!("{} {}", bullet, ver.to_string().cyan().bold())
+                    }
+                    InstallState::Both => {
+                        let bullet = format!("{}", "●".yellow());
+                        format!("{} {}", bullet, ver.to_string().yellow().bold())
+                    }
                 };
+                let text = if is_current {
+                    text.underline()
+                } else {
+                    text.normal()
+                };
+                let text = format!(" {}", text);
                 let padding = *col_w - visible_len;
                 cells.push(format!("{text}{:padding$}", ""));
             } else {
@@ -328,12 +363,16 @@ pub fn list(config: &Config, beta: bool) -> Result<()> {
         .join("");
     println!("{header_row}");
 
-    if !installed.is_empty() {
-        println!(
-            "\n  {} installed version(s)",
-            installed.len().to_string().green().bold()
-        );
-    }
+    // Print legend
+    println!();
+    println!(
+        " {} Std   {} Mono  {} Both  {}",
+        "●".green(),
+        "●".cyan(),
+        "●".yellow(),
+        "● Current".underline()
+    );
+    println!();
 
     Ok(())
 }
@@ -492,7 +531,7 @@ fn ask_yes_no(prompt: &str) -> Result<bool> {
     let mut input = String::new();
     std::io::stdin().read_line(&mut input)?;
     let answer = input.trim().to_lowercase();
-    Ok(answer.len() == 0 || answer == "y" || answer == "yes")
+    Ok(answer.is_empty() || answer == "y" || answer == "yes")
 }
 
 fn ask_mono() -> Result<bool> {
@@ -609,7 +648,7 @@ fn download_with_progress(url: &str, dest: &Path, expected_size: u64) -> Result<
     println!(
         "  {} {}",
         "↓".dimmed(),
-        url.split('/').last().unwrap_or("file")
+        url.split('/').next_back().unwrap_or("file")
     );
 
     let mut response = ureq::agent()
@@ -734,7 +773,7 @@ fn rename_executables(dir: &Path) -> Result<()> {
     };
 
     let godot_name = format!("godot{exe_ext}");
-    let console_name = format!("godot-console");
+    let console_name = "godot-console".to_string();
 
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;

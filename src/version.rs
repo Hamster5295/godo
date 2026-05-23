@@ -93,6 +93,10 @@ impl GodotVersion {
         }
     }
 
+    pub fn version_key(&self) -> String {
+        format!("{}.{}.{}-{}", self.major, self.minor, self.patch, self.pre)
+    }
+
     pub fn from_tag(tag: &str) -> Option<Self> {
         let tag = tag.strip_prefix('v').unwrap_or(tag);
         let (version_part, pre_part) = if let Some(idx) = tag.find('-') {
