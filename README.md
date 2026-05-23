@@ -5,15 +5,7 @@ Written in ***PURE*** Rust.
   
 ## Installation
 
-You can install `godo` by
-
-1. Cargo
-
-```shell
-cargo install godo
-```
-
-2. Downloading the artifact manually in Github Release page
+You can install `godo` by downloading the artifact manually in Github Release page
 
 
 ## Configuration
