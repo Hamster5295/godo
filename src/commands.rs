@@ -496,12 +496,7 @@ fn ask_yes_no(prompt: &str) -> Result<bool> {
 }
 
 fn ask_mono() -> Result<bool> {
-    print!("  Install mono version? [y/N] ");
-    std::io::stdout().flush()?;
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input)?;
-    let answer = input.trim().to_lowercase();
-    Ok(answer == "y" || answer == "yes")
+    ask_yes_no("Install mono version?")
 }
 
 pub fn get_installed_versions(config: &Config) -> Result<Vec<GodotVersion>> {
@@ -818,10 +813,6 @@ fn cleanup_temp(temp_dir: &Path, filename: &str) {
 pub fn update(config: &Config) -> Result<()> {
     println!("{}", "Updating manifest from GitHub...".dimmed());
     let releases = github::fetch_releases_remote(config.github_token.as_deref())?;
-    println!(
-        "  {} Fetched {} releases",
-        "✓".green(),
-        releases.len()
-    );
+    println!("  {} Fetched {} releases", "✓".green(), releases.len());
     Ok(())
 }
