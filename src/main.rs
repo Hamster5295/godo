@@ -1,357 +1,123 @@
-mod procedure;
-mod remote;
-mod utils;
+mod commands;
+mod config;
+mod github;
 mod version;
 
-use std::{fs, process::exit};
-
 use clap::{Parser, Subcommand};
-use console::Style;
-use dialoguer::Confirm;
-use remote::search_remote_version;
-use reqwest::Client;
-use symlink::{remove_symlink_dir, remove_symlink_file, symlink_dir, symlink_file};
+use colored::Colorize;
 
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-struct Args {
+#[command(name = "godo")]
+#[command(about = "A version manager for Godot Engine", version)]
+struct Cli {
     #[command(subcommand)]
-    command: CliCommand,
+    command: Commands,
 }
 
-#[derive(Subcommand, Clone)]
-enum CliCommand {
-    /// Install Godot with optional specific version.
+#[derive(Subcommand)]
+enum Commands {
+    /// Install Godot Engine with specific version
     Install {
-        /// The version to install.
-        version: Option<String>,
 
-        /// Whether to install the Mono version (with C# support).
-        #[arg(short, long)]
-        mono: bool,
-    },
+        /// The version to install. Fuzzy matching is supported.
+        version: String,
 
-    /// Uninstall specific Godot version.
-    Uninstall {
-        /// The version to install.
-        version: Option<String>,
-
-        /// Whether to install the Mono version (with C# support).
-        #[arg(short, long)]
-        mono: bool,
-    },
-
-    /// List available Godot versions.
-    Available {
-        /// Whether to list prereleased versions
-        #[arg(short, long)]
-        prerelease: bool,
-    },
-
-    /// List installed Godot versions.
-    List,
-
-    /// Run Godot with specific version.
-    Run {
-        /// The version to run. Automaticly runs the latest stable version when not specified.
-        version: Option<String>,
-
-        /// Whether to run the Mono version.
-        #[arg(short, long)]
+        /// Whether to install Mono version
+        #[arg(long, num_args = 0..=1, default_missing_value = "true")]
         mono: Option<bool>,
 
-        /// Whether to run with console. Has no effect with Godot 3.x
-        #[arg(short, long)]
-        console: bool,
+        /// Install directly without interactive interface, works only when --mono is specified
+        #[arg(long)]
+        silent: bool,
     },
 
-    /// Create a symbolic link 'current' pointing to specified version
+    /// Remove a locally installed Godot version
+    Rm {
+
+        /// The version to remove. Fuzzy matching is supported.
+        version: String,
+
+        /// Whether to remove Mono version
+        #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+        mono: Option<bool>,
+
+        /// Remove directly without interactive interface, works only when --mono is specified
+        #[arg(long)]
+        silent: bool,
+    },
+    
+    /// List all available Godot versions
+    List {
+
+        /// Show pre-release versions (beta, rc, dev, alpha)
+        #[arg(long)]
+        beta: bool,
+    },
+
+    /// Set the current active Godot version
     Current {
-        /// The version to run. Automaticly runs the latest stable version when not specified.
-        version: Option<String>,
 
-        /// Whether to run the Mono version.
-        #[arg(short, long)]
-        mono: bool,
+        /// The version to set as current. Fuzzy matching is supported.
+        version: String,
+
+        /// Whether to select Mono version
+        #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+        mono: Option<bool>,
+
+        /// Select directly without interactive interface, works only when --mono is specified
+        #[arg(long)]
+        silent: bool,
     },
+
+    /// Launch a Godot Engine instance
+    Run {
+
+        /// The version to launch. Defaults to current if omitted. Fuzzy matching is supported.
+        version: Option<String>,
+        
+        /// Whether to launch Mono version
+        #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+        mono: Option<bool>,
+    },
+
+    /// Update the Godot Engine release manifest manually
+    Update,
 }
 
-#[tokio::main]
-async fn main() {
-    let args = Args::parse();
+fn main() {
+    let cli = Cli::parse();
 
-    match &args.command {
-        CliCommand::Install { version, mono } => handle_install(version, mono).await,
-        CliCommand::Uninstall { version, mono } => handle_uninstall(version, mono),
-        CliCommand::Available { prerelease } => handle_available(prerelease).await,
-        CliCommand::List => handle_list(),
-        CliCommand::Run {
-            version,
-            mono,
-            console,
-        } => handle_run(version, mono, console).await,
-        CliCommand::Current { version, mono } => handle_current(version, mono.clone()),
-    }
-}
-
-async fn handle_available(prerelease: &bool) {
-    let client = Client::new();
-    remote::list_avail(&client, *prerelease).await;
-}
-
-fn handle_list() {
-    let dim = Style::new().dim();
-    let yellow = Style::new().yellow().bold();
-
-    println!("{}", yellow.apply_to("Installed"));
-    println!("{}", dim.apply_to("=".repeat(15)));
-
-    let installed_dirs = utils::get_installed_dirs();
-    if !installed_dirs.is_empty() {
-        for dir in installed_dirs {
-            if let Some(ver) = version::parse(dir) {
-                println!("{}", ver.short_name());
-            }
-        }
-    } else {
-        println!("{}", dim.apply_to("Nothing yet..."));
-    }
-}
-
-async fn handle_run(version: &Option<String>, mono: &Option<bool>, console: &bool) {
-    let red = Style::new().red().bold();
-
-    if let Some(ver) = utils::search_installed_version(version, *mono) {
-        if let Some(exec) = utils::get_executable(ver.dir_name(), *console) {
-            tokio::process::Command::new(exec)
-                .spawn()
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "{} {}: {}",
-                        red.apply_to("Failed to run"),
-                        red.apply_to(ver.version_name()),
-                        e
-                    )
-                });
-        }
-    } else {
-        println!("{}", red.apply_to("No installed version found."));
-        if Confirm::new()
-            .with_prompt("Install a new version?")
-            .wait_for_newline(true)
-            .interact()
-            .unwrap()
-        {
-            if let Some(mono_flag) = mono {
-                handle_install(version, mono_flag).await;
-            } else {
-                handle_install(version, &false).await;
-            }
-        } else {
-            println!("{}", red.apply_to("Aborted."));
-        }
-    }
-}
-
-async fn handle_install(version: &Option<String>, mono: &bool) {
-    let cyan = Style::new().cyan().bold().bright();
-    let yellow = Style::new().yellow().bold();
-    let cmd = Style::new().yellow().underlined().bold();
-    let red = Style::new().red().bold();
-    let green = Style::new().green().bold();
-
-    let proc = &mut procedure::new(5);
-    let client = Client::new();
-
-    proc.next("Searching for available versions...".to_string());
-    match search_remote_version(&client, version, *mono).await {
-        Some((ver, url)) => {
-            proc.finish("Found!".to_string());
-            let installed = utils::get_installed_versions();
-            if installed.contains(&ver) {
-                println!(
-                    "{} has been installed already.",
-                    cyan.apply_to(ver.version_name()),
-                );
-                println!(
-                    "Use {} to list the installed versions.",
-                    cmd.apply_to("godo list")
-                );
-                println!("{}", red.apply_to("Aborted."));
-                exit(0);
-            }
-
-            let version_name = ver.version_name();
-            let file_name = ver.dir_name();
-
-            // Confirm before download
-            proc.next("The following version is about to be installed:".to_string());
-            println!("\t> {} <", cyan.apply_to(&version_name));
-            if Confirm::new()
-                .with_prompt("Proceed?")
-                .default(true)
-                .show_default(true)
-                .wait_for_newline(true)
-                .interact()
-                .unwrap()
-            {
-                // Start download
-                proc.next(format!("{}", yellow.apply_to("Downloading...")));
-                let path = remote::download(&client, file_name, url).await;
-                proc.finish("Download Completed!".to_string());
-
-                // Unzip
-                proc.next(format!("{}", yellow.apply_to("Unzipping...")));
-                remote::unzip(&path, ver.mono());
-                proc.finish("Unzipped!".to_string());
-
-                // Remove the original zipped file
-                proc.next(format!("{}", yellow.apply_to("Clearing cache...")));
-                fs::remove_file(&path).unwrap();
-                proc.finish("Cleared!".to_string());
-
-                // Finished!
-                println!(
-                    "{} is now {}.",
-                    cyan.apply_to(&version_name),
-                    green.apply_to("READY")
-                );
-                println!(
-                    "Use {} {} to start.",
-                    cmd.apply_to("godo run"),
-                    green.apply_to(ver.tag())
-                );
-                println!();
-
-                if ver.mono() {
-                    let non_mono_ver = version::new(ver.tag(), false);
-                    if installed.contains(&non_mono_ver) {
-                        println!(
-                            "Non-Mono version {} is detected.",
-                            cyan.apply_to(non_mono_ver.short_name())
-                        );
-                        println!(
-                            "Mono version contains {} within non-mono ones.",
-                            yellow.apply_to("All Features")
-                        );
-
-                        if Confirm::new()
-                            .with_prompt("Uninstall the non-mono version?")
-                            .default(true)
-                            .show_default(true)
-                            .wait_for_newline(true)
-                            .interact()
-                            .unwrap()
-                        {
-                            handle_uninstall(&Some(non_mono_ver.tag()), &false);
-                        } else {
-                            println!("{}", green.apply_to("Done!"))
-                        }
-                    }
-                }
-            } else {
-                println!("{}", red.apply_to("Aborted."))
-            }
-        }
-        None => {
-            println!(
-                "{}\n> Use {} to find another version.",
-                red.apply_to("No Suitable Version found."),
-                yellow.apply_to("godo available")
-            )
+    let config = match config::Config::load() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Error loading config: {e}");
+            std::process::exit(1);
         }
     };
-}
 
-fn handle_uninstall(version: &Option<String>, mono: &bool) {
-    let red = Style::new().red().bold();
+    let result = match cli.command {
+        Commands::Install {
+            version,
+            mono,
+            silent,
+        } => commands::install(&config, &version, mono, silent),
+        Commands::Rm {
+            version,
+            mono,
+            silent,
+        } => commands::rm(&config, &version, mono, silent),
+        Commands::List { beta } => commands::list(&config, beta),
+        Commands::Current {
+            version,
+            mono,
+            silent,
+        } => commands::current(&config, &version, mono, silent),
+        Commands::Run { version, mono } => commands::run(&config, version.as_deref(), mono),
+        Commands::Update => commands::update(),
+    };
 
-    if let Some(ver) = utils::search_installed_version(version, Some(*mono)) {
-        let mut proc = procedure::new(2);
-
-        proc.next("The following version is about to be uninstalled:".to_string());
-        println!("\t> {} <", red.apply_to(ver.version_name()));
-        if Confirm::new()
-            .with_prompt("Do you want to proceed?")
-            .default(true)
-            .show_default(true)
-            .wait_for_newline(true)
-            .interact()
-            .unwrap()
-        {
-            proc.next("Uninstalling".to_string());
-            utils::uninstall_version(ver);
-            proc.finish("Uninstalled!".to_string());
-        } else {
-            println!("{}", red.apply_to("Aborted."))
-        }
-    } else {
-        println!("{}", red.apply_to("No installed version found."));
-    }
-}
-
-fn handle_current(version: &Option<String>, mono: bool) {
-    let red = Style::new().red().bold();
-    let green = Style::new().green().bold();
-    if let Some(ver) = utils::search_installed_version(version, Some(mono)) {
-        let folder = utils::get_current_path().join("current");
-        let gdsharp = utils::get_current_path().join("GodotSharp");
-        let exec = utils::get_current_path().join("godot.exe");
-        if fs::exists(&folder).unwrap() {
-            remove_symlink_dir(&folder).unwrap();
-        }
-        if fs::exists(&gdsharp).unwrap() {
-            remove_symlink_dir(&gdsharp).unwrap();
-        }
-        if fs::exists(&exec).unwrap() {
-            remove_symlink_file(&exec).unwrap();
-        }
-
-        if let Err(e) = symlink_dir(utils::get_install_path().join(ver.dir_name()), &folder) {
-            println!(
-                "{}: {e}",
-                red.apply_to("Failed to create symbolic link for godot executable folder")
-            );
-        } else {
-            println!(
-                "- {} linked to {}",
-                green.apply_to(ver.dir_name()),
-                green.apply_to("current")
-            );
-        }
-
-        if let Err(e) = symlink_dir(
-            utils::get_install_path()
-                .join(ver.dir_name())
-                .join("GodotSharp"),
-            &gdsharp,
-        ) {
-            println!(
-                "{}: {e}",
-                red.apply_to("Failed to create symbolic link for GodotSharp folder")
-            );
-        } else {
-            println!(
-                "- {} linked to {}",
-                green.apply_to(format!("{}/{}", ver.dir_name(), "GodotSharp")),
-                green.apply_to("GodotSharp")
-            );
-        }
-
-        let src = utils::get_executable(ver.dir_name(), false).unwrap();
-        if let Err(e) = symlink_file(&src, &exec) {
-            println!(
-                "{}: {e}",
-                red.apply_to("Failed to create symbolic link for executable")
-            );
-        } else {
-            println!(
-                "- {} linked to {}",
-                green.apply_to("Executable"),
-                green.apply_to("godot.exe")
-            );
-        }
-    } else {
-        println!("{}", red.apply_to("No installed version found."));
+    if let Err(e) = result {
+        eprintln!("{} {}", "!".red().bold(), e);
+        std::process::exit(1);
     }
 }
